@@ -36,18 +36,7 @@
       </nav>
 
       <div class="content-placeholder">
-        <h3>Plānotās Administratora Funkcijas:</h3>
-        <ul>
-          <li>Jaunu grupu izveide (2.2.6) - *Ieviests*</li>
-          <li>Esošo grupu pārvaldība (rediģēšana, dzēšana) - *Ieviests*</li>
-          <li>Pieteikumu apstiprināšana grupām (2.2.8) - *Ieviests*</li>
-          <li>
-            Lietotāju kontu administrēšana (saraksts, rediģēšana, dzēšana, lomu
-            maiņa) - *Šobrīd tiek ieviests*
-          </li>
-          <li>Studentu piesaiste/noņemšana no grupām</li>
-          <li>Studentu pievienotā satura moderēšana</li>
-        </ul>
+        <!-- Removed Plānotās Administratora Funkcijas section -->
       </div>
     </section>
   </div>
@@ -131,7 +120,15 @@ export default {
   background-color: #f9f9f9;
   border: 1px dashed #ddd;
   border-radius: 5px;
+  /* If it's empty now, you might want to adjust its styling or remove it if not needed */
+  min-height: 50px; /* Example: give it some height if it's just an empty box now */
 }
+/* If the .content-placeholder is now truly empty and not needed,
+   you can remove its styles or even the div itself.
+   For now, I've left it as an empty styled box. */
+
+/* Remove specific styles for h3 and ul if they are no longer present or needed */
+/*
 .content-placeholder h3 {
   margin-top: 0;
   color: #34495e;
@@ -144,4 +141,5 @@ export default {
   margin-bottom: 8px;
   color: #7f8c8d;
 }
+*/
 </style>
