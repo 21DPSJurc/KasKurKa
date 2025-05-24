@@ -99,8 +99,26 @@ router.post('/', authMiddleware, async (req, res) => {
         type: 'homework'
       };
       const result = await homeworkCollection.insertOne(newHomework);
-      const createdHomework = await homeworkCollection.findOne({ _id: result.insertedId });
-      res.status(201).json({ msg: 'Mājasdarbs veiksmīgi pievienots!', homework: createdHomework });
+      const createdHomeworkWithGroup = await homeworkCollection.aggregate([
+        { $match: { _id: result.insertedId } },
+        {
+          $lookup: {
+            from: 'groups',
+            localField: 'customGroupId',
+            foreignField: '_id',
+            as: 'groupInfo'
+          }
+        },
+        { $unwind: { path: '$groupInfo', preserveNullAndEmptyArrays: true } },
+        {
+          $addFields: {
+            customGroupName: { $ifNull: ['$groupInfo.name', 'Nezināma grupa'] }
+          }
+        },
+        { $project: { groupInfo: 0 } }
+      ]).toArray();
+
+      res.status(201).json({ msg: 'Mājasdarbs veiksmīgi pievienots!', homework: createdHomeworkWithGroup[0] || newHomework });
     } catch (err) {
       console.error('Error adding homework:', err);
       res.status(500).json({ msg: 'Servera kļūda pievienojot mājasdarbu.' });
@@ -109,28 +127,50 @@ router.post('/', authMiddleware, async (req, res) => {
 });
 
 // @route   GET api/homework
-// @desc    Get all homework relevant to the user
+// @desc    Get all homework relevant to the user (upcoming, sorted by dueDate asc)
 // @access  Private
 router.get('/', authMiddleware, async (req, res) => {
   try {
     const db = getDB();
     const homeworkCollection = db.collection('homeworks');
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Start of today
 
-    let query = {};
+    let initialMatch = {};
     if (req.user.role === 'student') {
       const enrolledCustomGroupObjectIds = (req.user.enrolledCustomGroupIds || []).map(id => new ObjectId(id));
       if (enrolledCustomGroupObjectIds.length === 0) {
-        return res.json([]); // Student not in any custom groups, sees no homework
+        return res.json([]);
       }
-      query = { customGroupId: { $in: enrolledCustomGroupObjectIds } };
+      initialMatch = { customGroupId: { $in: enrolledCustomGroupObjectIds } };
     } else if (req.user.role === 'admin') {
-      // Admin sees all homework
-      query = {};
+      initialMatch = {};
     } else {
       return res.status(403).json({ msg: "Nezināma lietotāja loma." });
     }
 
-    const homeworks = await homeworkCollection.find(query).sort({ dueDate: -1 }).toArray();
+    initialMatch.dueDate = { $gte: today }; // Only upcoming or today's homework
+
+    const homeworks = await homeworkCollection.aggregate([
+      { $match: initialMatch },
+      {
+        $lookup: {
+          from: 'groups',
+          localField: 'customGroupId',
+          foreignField: '_id',
+          as: 'groupInfo'
+        }
+      },
+      { $unwind: { path: '$groupInfo', preserveNullAndEmptyArrays: true } },
+      {
+        $addFields: {
+          customGroupName: { $ifNull: ['$groupInfo.name', 'Nezināma grupa'] }
+        }
+      },
+      { $project: { groupInfo: 0 } }, // Remove the full groupInfo object
+      { $sort: { dueDate: 1 } } // Sort by due date ascending (closest first)
+    ]).toArray();
+
     res.json(homeworks);
   } catch (err) {
     console.error('Error fetching homework:', err);
@@ -150,25 +190,41 @@ router.get('/:id', authMiddleware, async (req, res) => {
       return res.status(400).json({ msg: 'Nederīgs ID formāts.' });
     }
     const homeworkId = new ObjectId(req.params.id);
-    const homework = await homeworkCollection.findOne({ _id: homeworkId });
+
+    const homeworkArray = await homeworkCollection.aggregate([
+      { $match: { _id: homeworkId } },
+      {
+        $lookup: {
+          from: 'groups',
+          localField: 'customGroupId',
+          foreignField: '_id',
+          as: 'groupInfo'
+        }
+      },
+      { $unwind: { path: '$groupInfo', preserveNullAndEmptyArrays: true } },
+      {
+        $addFields: {
+          customGroupName: { $ifNull: ['$groupInfo.name', 'Nezināma grupa'] }
+        }
+      },
+      { $project: { groupInfo: 0 } }
+    ]).toArray();
+
+    const homework = homeworkArray.length > 0 ? homeworkArray[0] : null;
 
     if (!homework) {
       return res.status(404).json({ msg: 'Mājasdarbs nav atrasts.' });
     }
 
-    // Access control for students
     if (req.user.role === 'student') {
       const enrolledCustomGroupIdsStrings = req.user.enrolledCustomGroupIds || [];
       if (!homework.customGroupId || !enrolledCustomGroupIdsStrings.includes(homework.customGroupId.toString())) {
         return res.status(403).json({ msg: 'Jums nav tiesību skatīt šo mājasdarbu.' });
       }
     }
-    // Admins can see any homework by ID
-
     res.json(homework);
   } catch (err) {
     console.error('Error fetching single homework:', err);
-    // BSONError check was inside the if block, moved out
     if (err.name === 'BSONError') return res.status(400).json({ msg: 'Nederīgs ID formāts.' });
     res.status(500).json({ msg: 'Servera kļūda, ielādējot mājasdarbu.' });
   }
@@ -189,7 +245,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
       return res.status(400).json({ msg: err.message || 'Neatļauts faila tips vai cita augšupielādes kļūda.' });
     }
 
-    const { subject, description, dueDate, additionalInfo, links, customGroupId } = req.body; // Added customGroupId
+    const { subject, description, dueDate, additionalInfo, links, customGroupId } = req.body;
     const homeworkId = req.params.id;
     const errors = [];
 
@@ -205,7 +261,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
         errors.push('Norādītais datums nav korekts. Izmantojiet GGGG-MM-DD formātu.');
       }
     }
-    if (customGroupId && !ObjectId.isValid(customGroupId)) { // customGroupId is optional on update, if not provided, it's not changed
+    if (customGroupId && !ObjectId.isValid(customGroupId)) {
       errors.push('Norādītais grupas ID nav derīgs.');
     }
 
@@ -231,7 +287,6 @@ router.put('/:id', authMiddleware, async (req, res) => {
         return res.status(404).json({ msg: 'Mājasdarbs nav atrasts.' });
       }
 
-      // Authorization: Only owner or admin can edit
       if (existingHomework.userId.toString() !== req.user.id && req.user.role !== 'admin') {
         return res.status(403).json({ msg: 'Jums nav tiesību rediģēt šo mājasdarbu.' });
       }
@@ -243,7 +298,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
       if (typeof additionalInfo !== 'undefined') updateFields.additionalInfo = additionalInfo;
       if (typeof links !== 'undefined') updateFields.links = links ? links.split('\n').map(link => link.trim()).filter(link => link !== '') : [];
 
-      if (customGroupId) { // If a new customGroupId is provided
+      if (customGroupId) {
         if (req.user.role === 'student') {
           const userCreating = await usersCollection.findOne({ _id: new ObjectId(req.user.id) });
           const enrolledIds = (userCreating.enrolledCustomGroups || []).map(id => id.toString());
@@ -268,17 +323,31 @@ router.put('/:id', authMiddleware, async (req, res) => {
         updateFields.fileAttachments = [];
       }
 
-      const result = await homeworkCollection.updateOne(
+      await homeworkCollection.updateOne(
         { _id: itemObjectId },
         { $set: updateFields }
       );
 
-      if (result.matchedCount === 0) {
-        return res.status(404).json({ msg: 'Mājasdarbs netika atrasts.' }); // Should be caught by existingHomework check
-      }
+      const updatedHomeworkArr = await homeworkCollection.aggregate([
+        { $match: { _id: itemObjectId } },
+        {
+          $lookup: {
+            from: 'groups',
+            localField: 'customGroupId',
+            foreignField: '_id',
+            as: 'groupInfo'
+          }
+        },
+        { $unwind: { path: '$groupInfo', preserveNullAndEmptyArrays: true } },
+        {
+          $addFields: {
+            customGroupName: { $ifNull: ['$groupInfo.name', 'Nezināma grupa'] }
+          }
+        },
+        { $project: { groupInfo: 0 } }
+      ]).toArray();
 
-      const updatedHomework = await homeworkCollection.findOne({ _id: itemObjectId });
-      res.json({ msg: 'Mājasdarbs veiksmīgi atjaunināts!', homework: updatedHomework });
+      res.json({ msg: 'Mājasdarbs veiksmīgi atjaunināts!', homework: updatedHomeworkArr[0] });
 
     } catch (err) {
       console.error('Error updating homework:', err);
@@ -309,14 +378,12 @@ router.delete('/:id', authMiddleware, async (req, res) => {
       return res.status(404).json({ msg: 'Mājasdarbs nav atrasts.' });
     }
 
-    // Authorization: Only owner or admin can delete
     if (homeworkToDelete.userId.toString() !== req.user.id && req.user.role !== 'admin') {
       return res.status(403).json({ msg: 'Jums nav tiesību dzēst šo mājasdarbu.' });
     }
 
     const deleteResult = await homeworkCollection.deleteOne({ _id: itemObjectId });
     if (deleteResult.deletedCount === 0) {
-      // This case should ideally not be hit if homeworkToDelete was found
       return res.status(404).json({ msg: 'Mājasdarbs netika atrasts vai jau ir dzēsts.' });
     }
 
@@ -326,7 +393,6 @@ router.delete('/:id', authMiddleware, async (req, res) => {
     res.json({ msg: 'Mājasdarbs veiksmīgi dzēsts.' });
   } catch (err) {
     console.error('Error deleting homework:', err);
-    // BSONError check already done if ObjectId.isValid fails
     res.status(500).json({ msg: 'Servera kļūda, dzēšot mājasdarbu.' });
   }
 });

@@ -8,7 +8,7 @@ const { ObjectId } = require('mongodb');
 // @desc    Add a new test/examination entry
 // @access  Private
 router.post('/', authMiddleware, async (req, res) => {
-  const { subject, eventDate, eventTime, topics, format, additionalInfo, customGroupId } = req.body; // Added customGroupId
+  const { subject, eventDate, eventTime, topics, format, additionalInfo, customGroupId } = req.body;
   const errors = [];
   if (!subject || subject.trim() === '') errors.push('Mācību priekšmets ir obligāts lauks.');
   if (!eventDate) errors.push('Norises datums ir obligāts lauks.');
@@ -53,16 +53,34 @@ router.post('/', authMiddleware, async (req, res) => {
       format: format || '', additionalInfo: additionalInfo || '',
       userId: new ObjectId(req.user.id),
       userFirstName: req.user.firstName,
-      userGroup: req.user.group, // Creator's registration group for display
+      userGroup: req.user.group,
       userStudyStartYear: req.user.studyStartYear,
-      customGroupId: new ObjectId(customGroupId), // The custom group this item belongs to
+      customGroupId: new ObjectId(customGroupId),
       createdAt: new Date(),
       updatedAt: new Date(),
       type: 'test'
     };
     const result = await testsCollection.insertOne(newTest);
-    const createdTest = await testsCollection.findOne({ _id: result.insertedId });
-    res.status(201).json({ msg: 'Pārbaudes darbs veiksmīgi pievienots!', test: createdTest });
+    const createdTestWithGroup = await testsCollection.aggregate([
+      { $match: { _id: result.insertedId } },
+      {
+        $lookup: {
+          from: 'groups',
+          localField: 'customGroupId',
+          foreignField: '_id',
+          as: 'groupInfo'
+        }
+      },
+      { $unwind: { path: '$groupInfo', preserveNullAndEmptyArrays: true } },
+      {
+        $addFields: {
+          customGroupName: { $ifNull: ['$groupInfo.name', 'Nezināma grupa'] }
+        }
+      },
+      { $project: { groupInfo: 0 } }
+    ]).toArray();
+
+    res.status(201).json({ msg: 'Pārbaudes darbs veiksmīgi pievienots!', test: createdTestWithGroup[0] || newTest });
   } catch (err) {
     console.error('Error adding test:', err);
     res.status(500).json({ msg: 'Servera kļūda pievienojot pārbaudes darbu.' });
@@ -70,28 +88,50 @@ router.post('/', authMiddleware, async (req, res) => {
 });
 
 // @route   GET api/tests
-// @desc    Get all tests relevant to the user
+// @desc    Get all tests relevant to the user (upcoming, sorted by eventDate asc)
 // @access  Private
 router.get('/', authMiddleware, async (req, res) => {
   try {
     const db = getDB();
     const testsCollection = db.collection('tests');
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Start of today
 
-    let query = {};
+    let initialMatch = {};
     if (req.user.role === 'student') {
       const enrolledCustomGroupObjectIds = (req.user.enrolledCustomGroupIds || []).map(id => new ObjectId(id));
       if (enrolledCustomGroupObjectIds.length === 0) {
-        return res.json([]); // Student not in any custom groups, sees no tests
+        return res.json([]);
       }
-      query = { customGroupId: { $in: enrolledCustomGroupObjectIds } };
+      initialMatch = { customGroupId: { $in: enrolledCustomGroupObjectIds } };
     } else if (req.user.role === 'admin') {
-      // Admin sees all tests
-      query = {};
+      initialMatch = {};
     } else {
       return res.status(403).json({ msg: "Nezināma lietotāja loma." });
     }
 
-    const tests = await testsCollection.find(query).sort({ eventDate: -1 }).toArray();
+    initialMatch.eventDate = { $gte: today }; // Only upcoming or today's tests
+
+    const tests = await testsCollection.aggregate([
+      { $match: initialMatch },
+      {
+        $lookup: {
+          from: 'groups',
+          localField: 'customGroupId',
+          foreignField: '_id',
+          as: 'groupInfo'
+        }
+      },
+      { $unwind: { path: '$groupInfo', preserveNullAndEmptyArrays: true } },
+      {
+        $addFields: {
+          customGroupName: { $ifNull: ['$groupInfo.name', 'Nezināma grupa'] }
+        }
+      },
+      { $project: { groupInfo: 0 } },
+      { $sort: { eventDate: 1 } } // Sort by event date ascending (closest first)
+    ]).toArray();
+
     res.json(tests);
   } catch (err) {
     console.error('Error fetching tests:', err);
@@ -111,7 +151,28 @@ router.get('/:id', authMiddleware, async (req, res) => {
       return res.status(400).json({ msg: 'Nederīgs ID formāts.' });
     }
     const testId = new ObjectId(req.params.id);
-    const test = await testsCollection.findOne({ _id: testId });
+
+    const testArray = await testsCollection.aggregate([
+      { $match: { _id: testId } },
+      {
+        $lookup: {
+          from: 'groups',
+          localField: 'customGroupId',
+          foreignField: '_id',
+          as: 'groupInfo'
+        }
+      },
+      { $unwind: { path: '$groupInfo', preserveNullAndEmptyArrays: true } },
+      {
+        $addFields: {
+          customGroupName: { $ifNull: ['$groupInfo.name', 'Nezināma grupa'] }
+        }
+      },
+      { $project: { groupInfo: 0 } }
+    ]).toArray();
+
+    const test = testArray.length > 0 ? testArray[0] : null;
+
 
     if (!test) {
       return res.status(404).json({ msg: 'Pārbaudes darbs nav atrasts.' });
@@ -123,8 +184,6 @@ router.get('/:id', authMiddleware, async (req, res) => {
         return res.status(403).json({ msg: 'Jums nav tiesību skatīt šo pārbaudes darbu.' });
       }
     }
-    // Admins can see any test by ID
-
     res.json(test);
   } catch (err) {
     console.error('Error fetching single test:', err);
@@ -137,7 +196,7 @@ router.get('/:id', authMiddleware, async (req, res) => {
 // @desc    Update a test/examination entry
 // @access  Private (only owner or admin)
 router.put('/:id', authMiddleware, async (req, res) => {
-  const { subject, eventDate, eventTime, topics, format, additionalInfo, customGroupId } = req.body; // Added customGroupId
+  const { subject, eventDate, eventTime, topics, format, additionalInfo, customGroupId } = req.body;
   const testId = req.params.id;
   const errors = [];
 
@@ -199,17 +258,31 @@ router.put('/:id', authMiddleware, async (req, res) => {
       updateFields.customGroupId = new ObjectId(customGroupId);
     }
 
-    const result = await testsCollection.updateOne(
+    await testsCollection.updateOne(
       { _id: itemObjectId },
       { $set: updateFields }
     );
 
-    if (result.matchedCount === 0) { // Should not happen if previous checks passed
-      return res.status(404).json({ msg: 'Pārbaudes darbs nav atrasts.' });
-    }
+    const updatedTestArr = await testsCollection.aggregate([
+      { $match: { _id: itemObjectId } },
+      {
+        $lookup: {
+          from: 'groups',
+          localField: 'customGroupId',
+          foreignField: '_id',
+          as: 'groupInfo'
+        }
+      },
+      { $unwind: { path: '$groupInfo', preserveNullAndEmptyArrays: true } },
+      {
+        $addFields: {
+          customGroupName: { $ifNull: ['$groupInfo.name', 'Nezināma grupa'] }
+        }
+      },
+      { $project: { groupInfo: 0 } }
+    ]).toArray();
 
-    const updatedTest = await testsCollection.findOne({ _id: itemObjectId });
-    res.json({ msg: 'Pārbaudes darbs veiksmīgi atjaunināts!', test: updatedTest });
+    res.json({ msg: 'Pārbaudes darbs veiksmīgi atjaunināts!', test: updatedTestArr[0] });
 
   } catch (err) {
     console.error('Error updating test:', err);
@@ -243,7 +316,7 @@ router.delete('/:id', authMiddleware, async (req, res) => {
     }
 
     const deleteResult = await testsCollection.deleteOne({ _id: itemObjectId });
-    if (deleteResult.deletedCount === 0) { // Should not happen
+    if (deleteResult.deletedCount === 0) {
       return res.status(404).json({ msg: 'Pārbaudes darbs netika atrasts vai jau ir dzēsts.' });
     }
 
