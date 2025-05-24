@@ -1,0 +1,348 @@
+    
+   RIGAS VALSTS TEHNIKUMS
+   DATORIKAS NODALA
+   Izglitibas programma: Programmešana
+      
+   KVALIFIKACIJAS DARBS
+   Timekla lietojumprogramma "KasKurKa"
+    
+    Paskaidrojošais raksts __ lpp.
+    
+    Audzeknis:                                                                   Sidnijs Jurciks
+    Prakses vaditajs:                                                   Normunds Pauders
+    Nodalas vaditajs:                                                     Normunds Barbans
+    
+    
+    
+    
+    
+Riga 2025
+      
+    ANOTACIJA
+      KasKurKa majasdarbu parvaldes sistema ir izstradata, lai studenti butu spejigi efektivi parvaldit sava kursa majasdarbus un palidzet viens otram situacijas, kad majasdarbi tika izteikti tikai mutiski vai "paslepti" gruti uztveramas majaslapas, ka ari ši sistema lauj nodot informaciju par gaiditajiem parbaudes darbu datumiem. Sistemas izstrades laika tika izmantotas tadas tehnologijas ka Vue.js, Node.js ar Express.js, PostgreSQL, Docker, GitHub.
+      Kvalifikacijas darbs ietver ievadu, uzdevumu nostadni, prasibu specifikaciju, uzdevuma risinašanas lidzeklu izveles pamatojumu, programmaturas produkta modelešanas un projektešanas aprakstu, datu strukturu aprakstu un secinajumus. Ievada ir aprakstita majasdarbu parvaldes sistemas aktualitate. Uzdevumu nostadne ir noraditi uzdevumi, kurus sistemai bus nepieciešams veikt. Prasibu specifikacija sastav no ieejas un izejas informacijas, ka ari no sistemas funkcionalajam un nefunkcionalajam prasibam. Uzdevuma risinašanas lidzeklu izveles pamatojuma ir noraditi izstradašanai izmantotie lidzekli un to pielietojums. Programmaturas produkta modelešanas un projektešanas apraksts ietver sistemas strukturas modeli un funkcionalo sistemas modeli. Datu strukturu apraksta tiek paradita datu bazes relaciju shema, ka ari tabulu struktura ar datu tipu un datu garuma noradišanu. Lietotaja celvedi ir noraditas sistemas prasibas aparaturai un programmaturai, instalacija un palaišana, ka ari programmas lietošanas pamaciba. Testa piemera ir dots detalizets autentificešanas un jauna konta izveides apraksts ar vizualiem atteliem. 
+      Kvalifikacijas darbs sastav no  lappusem, kuras ietilpst  atteli,  tabulas un  pielikuma. Pielikums satur programmas pirmkodu fragmentus.
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+Saturs
+      No table of contents entries found.
+      
+
+    IEVADS
+      Šobrid macibu process lielakaja dala no tehnikumiem sastav no vairakam majasdarbu parvaldes programmam un pateicoties tam eksiste nozimiga dala skolotaju, kuri neskaidri un nekonsekventa veida publice informaciju par majasdarbu pildišanas kartibu. Tas ir nozimigi vieglak atrast darba resursus lai sakartotu esošo situaciju starp noteiktas klases skoleniem, neka censties pierunat skolotajus mainit to ierasto darba kartibu, ka ari skolas atteikties no darbu parvaldes sistemam un skolnieku profilu parvaldes majaslapam.
+      Tirgus izpete rada, ka centralizeta darbu parvaldes sistema eksiste citas iestades, visnozimigak - universitates, tomer, ja skolotajs nolemj pateikt kadu komentaru par iespejamo parbaudes darbu laiku tas, pašsaprotami, netiek ieklauts formalajas parvaldes sistemas un galvenokart tiek nodots visparigi caur studentu savstarpejo komunikaciju.
+      Nozimigs piemers, kad tiek apspriesta studentu informacijas parvalde ir ORTUS studiju portals - Rigas Tehniskas universitates centralizeta parvaldes sistema ar visiem studentiem nepieciešamajiem datiem, kas veicina skaidru informacijas nodošanu par darbu izpildes terminiem un tam lidzigi.
+      
+
+1. UZDEVUMA NOSTADNE
+      Kvalifikacijas darba uzdevums ir izveidot majasdarbu parvaldes sistemu "KasKurKa". Sistema nepieciešams realizet iespeju studentiem centralizeti apkopot, parvaldit un dalities ar informaciju par sava kursa majasdarbiem un gaidamajiem parbaudes darbiem. Studentiem ir jabut iespejai erti pievienot jaunus majasdarbu un parbaudes darbu ierakstus, ipaši tos, par kuriem informacija ir sniegta mutiski, neskaidri vai ir izkliedeta dažadas platformas. Sistemai janodrošina parskatams veids, ka sekot lidzi macibu uzdevumu terminiem un saturam viena kursa ietvaros.
+      Ir planotas vairakas funkcijas:
+* Studentiem (sistemas lietotajiem) bus iespeja:
+o registreties sistema un autorizeties, lai pieklutu sava kursa informacijai;
+o pievienot jaunus majasdarbu ierakstus, noradot macibu priekšmetu, detalizetu uzdevuma aprakstu, izpildes terminu, ka ari iespeju pievienot papildus informaciju (piemeram, norades par mutiski sanemtu uzdevumu, saites uz nepieciešamajiem resursiem vai failus);
+o pievienot informaciju par gaidamajiem parbaudes darbiem, noradot macibu priekšmetu, norises datumu, laiku un citu butisku informaciju (piemeram, parbaudes darba temas, formatu);
+o apskatit kopigu, strukturetu sarakstu ar visiem kursa aktualajiem majasdarbiem un parbaudes darbiem, ar iespeju tos filtret (piemeram, pec priekšmeta, termina) un kartot;
+o rediget un dzest paša izveidotos majasdarbu vai parbaudes darbu ierakstus;
+o atzimet majasdarbus ka izpilditus personigai progresa uzskaitei;
+o iespejams, pievienot komentarus vai labojumus citu kursabiedru veidotiem ierakstiem, lai nodrošinatu informacijas precizitati un veicinatu sadarbibu.
+* Administratoriem (sistemas parvaldniekiem) bus iespeja:
+o parvaldit lietotaju kontus: rediget esošo lietotaju informaciju, dzest kontus, pieškirt/mainit lietotaju lomas;
+o izveidot un parvaldit grupas/kursus: definet jaunas grupas (piemeram, "DT3", "Programmešana P1"), pievienot aprakstus, rediget un dzest grupas;
+o apstiprinat skolenu pieteikumus uz grupam;
+o piesaistit studentus konkretam grupam/kursiem un nonemt tos;
+o parskatit un, nepieciešamibas gadijuma, moderet studentu pievienoto saturu (majasdarbus, komentarus);
+
+
+2. PRASIBU SPECIFIKACIJA
+2.1. Ieejas un izejas informacijas apraksts
+2.1.1. Ieejas informacijas apraksts
+      Sistema tiks nodrošinata šads ieejas informacijas, ko ievadis lietotajs no tastaturas, apstrade.
+1. Informacijas par lietotajiem sastaves no šadiem datiem.
+* Vards - Burtu teksts ar burtu skaitu lidz 30 (piem. Evija).
+* Uzvards - Burtu teksts ar burtu skaitu lidz 30 (piem. Priede).
+* Macibu sakuma gads - Cipars no tagadejais gads - 4  lidz tagadejais gads (piem. 2024).
+* Grupa - rakstzimes lidz 8 burtiem (piem. DT3-2).
+* E-pasts - Deriga e-pasta adrese (piem. sidnijs.jurciks@epasts.com) .
+* Parole - Rakstzimju virkne (8 rakstzimes, vismaz 1 cipars).
+* Administratora statuss (true/false).
+2. Informacija par majasdarbiem/parbaudes darbiem (ievada studenti):
+*  Macibu priekšmets - Teksts lidz 50 rakstzimem (piem. Programmešanas pamati).
+* Uzdevuma apraksts - Teksts lidz 1000 rakstzimem.
+* Izpildes terminš - Datums (DD.MM.GGGG formata).
+* Papildus informacija (neobligati) - Teksts, saites, failu nosaukumi (piem. saite uz Google Docs, norade uz mutisku uzdevumu).
+* Tips - Izvele no saraksta (Majasdarbs, Parbaudes darbs).
+3. Informacija par grupam/kursiem (ievada administrators):
+* Grupas/Kursa nosaukums - Unikals burtu/ciparu teksts lidz 50 rakstzimem (piem. DT3-1, Anglu valoda B2).
+* Grupas/Kursa apraksts (neobligats) - Teksts lidz 255 rakstzimem, kas paskaidro grupas merki vai saturu.
+* Macibu gads (neobligats) - Piemeram, 2024/2025, lai grupetu kursus pa gadiem.
+
+2.1.2. Izejas informacijas apraksts
+1. Majasdarbu saraksta izdruka ar visiem majasdarbiem noteiktaja laika perioda noteiktajai grupai. Tabula noraditi visi izveletie priekšmeti un to pasniegšanas laiki. Tabula jabut grupas nosaukumam un laika periodam.
+2. Lietotaju saraksta izdruka (administratoram) ar visiem sistema registretajiem lietotajiem, noradot vardu, uzvardu, e-pastu, lomu un piesaistito grupu (ja students).
+3. Grupu/kursu saraksta izdruka (administratoram) ar visam sistema izveidotajam grupam, noradot nosaukumu, aprakstu un studentu skaitu grupa.
+4. Sistemas pazinojumi lietotajam par veiksmigam/neveiksmigam darbibam (piem., "Majasdarbs veiksmigi pievienots", "Grupa veiksmigi izveidota", "Lietotaja parole nomainita", "Kluda: Nepareiza parole").
+5. Personigais progresa parskats studentam par majasdarbu izpildi.
+2.2. Funkcionalas prasibas
+1. Lietotaja registracija sistema
+Identifikators2.2.1      Ievads      Funkcija paredzeta, lai jauni lietotaji (studenti) varetu izveidot kontu sistema "KasKurKa", lai pieklutu sava kursa majasdarbu un parbaudes darbu informacijai.      Ievaddati      1. Vards: Obligats lauks. Teksts, burtu skaits lidz 30 (piem. Evija).
+2. Uzvards: Obligats lauks. Teksts, burtu skaits lidz 30 (piem. Priede).
+3. E-pasts: Obligats lauks. Unikals, jaatbilst e-pasta formatam (piem. evija.priede@epasts.lv). 
+4. Parole: Obligats lauks. Teksts, minimalais garums 8 rakstzimes, jaietver vismaz viens lielais burts, viens mazais burts un viens cipars.
+5. Paroles apstiprinajums: Obligats lauks. Jasakrit ar lauka "Parole" ievadito vertibu.
+6. Macibu sakuma gads: Obligats lauks. Cipars no tagadejais gads - 4 lidz tagadejais gads (piem. 2023).
+7. Grupa: Obligats lauks. Rakstzimes, lidz 3 burtiem (piem. DT3).
+8. Apakšgrupa: Neobligats lauks. Rakstzimes, lidz 2 burtiem (piem. 4).      Apstrade      1. Sistema parbauda vai visi obligatie lauki ir aizpilditi.
+2. Sistema valide e-pasta formatu.
+3. Sistema parbauda, vai ievaditais e-pasts jau nav registrets sistema.
+4. Sistema parbauda paroles atbilstibu minimalajam drošibas prasibam.
+5. Sistema parbauda, vai lauki "Parole" un "Paroles apstiprinajums" sakrit.
+6. Ja visas parbaudes ir veiksmigas, sistema saglaba jauna lietotaja datus datubaze, šifrejot paroli.      Izvaddati      1. Veiksmigas registracijas gadijuma: Dots pazinojums par veiksmigu registraciju un notiek novirzišana uz pieteikšanas funkcionalitati.      2. Neveiksmigas registracijas gadijuma: Kludas pazinojums, noradot uz konkreto problemu (piem., e-pasts jau aiznemts, paroles nesakrit, parole neatbilst drošibas prasibam).      Kludas pazinojumi      1. "Ludzu, aizpildiet visus obligatos laukus." 
+2. "Noraditais e-pasts jau ir registrets." 
+3. "Nepareizs e-pasta formats." 
+4. "Parolei jabut vismaz 8 rakstzimes garai un jasatur vismaz viens lielais burts, viens mazais burts un viens cipars." 
+5.  "Ievaditas paroles nesakrit."      Izsaucamas prasibas      Pec veiksmigas registracijas var tikt izsaukta "Lietotaja pieteikšanas sistemai" (2.2.2) funkcionalitate vai lietotajs tiek novirzits uz pieteikšanas lapu.            
+2. Lietotaja pieteikšanas sistemai
+Identifikators2.2.2      Ievads      Funkcija paredzeta, lai registreti lietotaji varetu pieslegties sistemai "KasKurKa", izmantojot savu e-pastu un paroli.      Ievaddati      1. E-pasts: Obligats lauks. Lietotaja registretais e-pasts.
+2. Parole: Obligats lauks. Lietotaja registreta parole.      Apstrade      1. Sistema parbauda, vai abi lauki ir aizpilditi.
+2. Sistema mekle datubaze lietotaju ar noradito e-pastu.
+3. Ja lietotajs tiek atrasts, sistema salidzina ievadito paroli ar datubaze saglabato šifreto paroli.
+4. Ja e-pasts un parole sakrit, sistema izveido lietotaja sesiju un novirza uz galveno informacijas paneli.      Izvaddati      1. Veiksmigas pieteikšanas gadijuma: Lietotajs tiek novirzits uz sistemas galveno lapu (piemeram, majasdarbu sarakstu).
+2. Neveiksmigas pieteikšanas gadijuma: Kludas pazinojums.      Kludas pazinojumi      1. "Nepareizs e-pasts vai parole."
+2. "Ludzu, ievadiet e-pastu un paroli."      Izsaucamas prasibas      Pec veiksmigas pieteikšanas lietotajam ir pieejamas citas sistemas funkcijas atbilstoši vina lomai (piem., "Jauna majasdarba ieraksta pievienošana", "Majasdarbu un parbaudes darbu saraksta apskate").      3. Jauna majasdarba ieraksta pievienošana
+Identifikators2.2.3      Ievads      Funkcija paredzeta, lai autorizeti lietotaji (studenti) varetu pievienot jaunus majasdarbu ierakstus sistema, noradot visu nepieciešamo informaciju.      Ievaddati      1. Macibu priekšmets: Obligats lauks. Izvele no iepriekš defineta saraksta vai briva teksta ievade (piem. Programmešana, Matematika).
+2. Detalizets uzdevuma apraksts: Obligats lauks. Teksta lauks ar formatešanas iespejam (piem. izveidot programmu, kas aprekina...).
+3. Izpildes terminš: Obligats lauks. Datuma izvele no kalendara.
+4. Papildus informacija (noradits mutiski, u.c.): Neobligats lauks. Teksta lauks.
+5. Saites uz nepieciešamajiem resursiem: Neobligats lauks. Iespeja pievienot vienu vai vairakas hipersaites.
+6. Faili: Neobligats lauks. Iespeja pievienot vienu vai vairakus failus (piem., .pdf, .docx, .zip), ar noteiktu maksimalo izmeru vienam failam un kopejo izmeru.      Apstrade      1. Sistema parbauda visu obligato lauku aizpildišanu.
+2. Sistema valide datuma formatu.
+3. Sistema valide saišu formatu (ja tika ievaditas).
+4. Sistema parbauda pievienoto failu tipus un izmerus (ja tadi pievienoti).
+5. Ja visas parbaudes ir veiksmigas, sistema saglaba jauno majasdarba ierakstu datubaze, sasaistot to ar lietotaju, kurš to pievienojis, un vina kursu/grupu.      Izvaddati      1. Veiksmigas pievienošanas gadijuma: Pazinojums par veiksmigu ieraksta pievienošanu, un jaunais ieraksts paradas kopeja majasdarbu saraksta.
+2. Neveiksmigas pievienošanas gadijuma: Kludas pazinojums, noradot uz konkreto problemu.      Kludas pazinojumi      1. "Ludzu, aizpildiet visus obligatos laukus."
+2. "Noraditais datums nav korekts."
+3. "Pievienotais fails ir parak liels vai neatlauta veida."
+4. "Noradita saite nav korekta."      Izsaucamas prasibas      Pec pievienošanas tiek atjaunots "Majasdarbu un parbaudes darbu saraksta apskate" (2.2.5).      4. Jauna parbaudes darba informacijas pievienošana
+Identifikators2.2.4      Ievads      Funkcija paredzeta, lai autorizeti lietotaji (studenti) varetu pievienot informaciju par gaidamajiem parbaudes darbiem.      Ievaddati      1. Macibu priekšmets: Obligats lauks. Izvele no iepriekš defineta saraksta vai briva teksta ievade.
+2. Norises datums: Obligats lauks. Datuma izvele no kalendara.
+3. Norises laiks: Neobligats lauks. Laika izvele (piem. 10:00).
+4. Parbaudes darba temas: Neobligats lauks. Teksta lauks.
+5. Formats (piem., tests, eseja, prezentacija): Neobligats lauks. Teksta lauks.
+6. Cita butiska informacija: Neobligats lauks. Teksta lauks.      Apstrade      1. Sistema parbauda visu obligato lauku aizpildišanu.
+2. Sistema valide datuma un laika formatu.
+3. Ja visas parbaudes ir veiksmigas, sistema saglaba jauno parbaudes darba ierakstu datubaze, sasaistot to ar lietotaju un vina kursu/grupu.      Izvaddati      1. Veiksmigas pievienošanas gadijuma: Pazinojums par veiksmigu ieraksta pievienošanu, un jaunais ieraksts paradas kopeja saraksta.
+2. Neveiksmigas pievienošanas gadijuma: Kludas pazinojums.      Kludas pazinojumi      1. "Ludzu, aizpildiet visus obligatos laukus."
+2. "Noraditais datums vai laiks nav korekts."      Izsaucamas prasibas      Pec pievienošanas tiek atjaunots "Majasdarbu un parbaudes darbu saraksta apskate" (2.2.5).      5. Majasdarbu un parbaudes darbu saraksta apskate
+Identifikators2.2.5      Ievads      Funkcija nodrošina autorizetiem lietotajiem iespeju apskatit kopigu, strukturetu sarakstu ar visiem kursa aktualajiem majasdarbiem un parbaudes darbiem, ar iespeju tos filtret un kartot.      Ievaddati      1. Filtrešanas kriteriji (neobligati):
+* Pec macibu priekšmeta.
+* Pec izpildes/norises termina (datumu diapazons).
+* Pec ieraksta tipa (majasdarbs/parbaudes darbs).
+* Pec statusa (personigais statuss: izpildits/neizpildits - tikai majasdarbiem).
+2. Kartošanas kriteriji (neobligati):
+* Pec izpildes/norises termina (augoši/dilstoši).
+* Pec pievienošanas datuma (jaunakie/vecakie pirmie).
+* Pec macibu priekšmeta (alfabetiski).      Apstrade      1. Sistema atlasa visus majasdarbu un parbaudes darbu ierakstus, kas attiecas uz lietotaja kursu/grupu.
+2. Ja noraditi filtrešanas kriteriji, sistema tos piemero atlasitajiem datiem.
+3. Ja noraditi kartošanas kriteriji, sistema sakarto atlasitos datus.
+4. Sistema attelo rezultatus lietotajam parskatama veida (piem., tabula, saraksts).      Izvaddati      1. Strukturets saraksts ar majasdarbiem un parbaudes darbiem, kur katram ierakstam redzams: macibu priekšmets, iss apraksts/nosaukums, izpildes/norises terminš, tips, pievienotajs, personigais izpildes statuss (majasdarbiem).
+2. Vadibas elementi filtrešanai un kartošanai.
+3. Iespeja pieklut katra ieraksta detalizetai informacijai.      Kludas pazinojumi      1. "Pec jusu izveletajiem kriterijiem nekas nav atrasts." (Ja filtrešana neatgriež rezultatus).            
+      
+      
+      Citas funkcionalas prasibas
+6. Jaunas grupas izveidošana:
+6.1.  Lietotajam ar administratora atlaujam janodrošina speju izveidot jaunu grupu.
+7. Pieteikšanas uz grupu:
+7.1.  Lietotajiem janodrošina speju meklet grupas ar kartošanas funkcionalitati.
+7.2.  Lietotajiem janodrošina speju izveidot pieteikumus uz grupam.
+8. Grupas pieteikumu apstiprinašana:
+8.1.  Lietotajiem ar administratora atlaujam jabut spejigiem redzet pieteikumus uz grupam no citiem lietotajiem un tos apstiprinat/noraidit.
+9. Paša izveidoto ierakstu redigešana:
+9.1.  Lietotajam janodrošina iespeja rediget tikai paša izveidotos majasdarbu vai parbaudes darbu ierakstus.
+9.2.  Redigešanas forma jabut iespejai mainit visus sakotneji ievaditos laukus (priekšmets, apraksts, terminš, papildus informacija, saites, faili).
+9.3.  Pec izmainu saglabašanas, atjauninata informacija jaattelo kopeja saraksta un detalizetaja skata.
+10. Paša izveidoto ierakstu dzešana:
+10.1.  Lietotajam janodrošina speja dzest tikai paša izveidotos majasdarbu vai parbaudes darbu ierakstus.
+10.2.  Pirms galigas dzešanas sistemai japieprasa apstiprinajums no lietotaja (piem., "Vai tiešam velaties dzest šo ierakstu?").
+10.3.  Pec apstiprinajuma sanemšanas ieraksts tiek neatgriezeniski dzests no datubazes un vairs nav redzams saraksta.
+11. Majasdarbu atzimešana ka 'izpilditi' (Lietotaja progresa uzskaitei):
+11.1.  Lietotajam janodrošina iespeja atzimet jebkuru majasdarbu (gan paša, gan citu pievienotu) ka "izpilditu" vai "neizpilditu".
+11.2.  Ši atzime ir personiga un redzama tikai pašam lietotajam.
+11.3.  Saraksta skata jabut vizualai noradei par majasdarba personigo izpildes statusu.
+12. Komentaru vai labojumu ierosinajumu pievienošana citu kursabiedru ierakstiem:
+12.1.  Lietotajam janodrošina iespeja pievienot komentarus pie jebkura majasdarba vai parbaudes darba ieraksta detalizetaja skata.
+12.2.  Komentariem jabut redzamiem visiem kursa biedriem, kuriem ir piekluve konkretajam ierakstam.
+12.3.  Katram komentaram janorada ta autors un pievienošanas laiks.
+12.4.  Lietotajam jabut iespejai ierosinat labojumus ierakstam, par to tiek pazinots ieraksta autoram.
+13. Lietotaja iziešana no sistemas:
+13.1. Lietotajam janodrošina skaidri redzama iespeja iziet no sistemas.
+13.2. Pec iziešanas lietotaja sesija tiek partraukta, un piekluve aizsargatajam sistemas dalam tiek liegta lidz nakamajai veiksmigai pieteikšanas reizei.
+13.3. Lietotajs tiek novirzits uz pieteikšanas lapu vai sakumlapu.
+2.3  Nefunkcionalas prasibas
+1. Sistemas lietotaja saskarnei primari jabut latviešu valoda.
+2. Timekla lietojumprogrammai automatiski japielagojas dažadiem ekrana izmeriem (datori, planšetdatori, viedtalruni), saglabajot ertu lietojamibu un lasamibu visas ierices
+3. Sistemas navigacijai jabut logiskai un viegli saprotamai, laujot lietotajiem atri atrast nepieciešamo informaciju un funkcijas.
+4. Sistemai jabut viegli apgustamai jauniem lietotajiem, neprasot plašu iepriekšeju apmacibu vai dokumentacijas studešanu.
+5. Sistemai operativi jasniedz lietotajam informativi pazinojumi par veiksmigam darbibam (piem., "Majasdarbs veiksmigi pievienots") vai kludam (piem., "Nepareizs datu formats"), palidzot saprast sistemas stavokli un nakamos solus. 
+6. Sistemai jacenšas noverst lietotaju kludas, piemeram, validejot ievaditos datus reallaika. Kludu gadijuma jasniedz skaidri, konstruktivi pazinojumi.
+7. Sistemai, cik tas ir iespejams projekta ietvaros, jacenšas ieverot timekla satura pieejamibas vadliniju (WCAG) pamatprincipus (piemeram, pietiekams krasu kontrasts, iespeja naviget ar tastaturu).
+8. Galvenajam sistemas lapam (piem., majasdarbu saraksts, individuala ieraksta skats) jaieladejas pienemama laika (piem., ne ilgak ka 3-5 sekundes) pie videjas slodzes.
+9. Lietotaja darbibam, kas saistitas ar datu apstradi (piemeram, jauna ieraksta pievienošana, filtra pielietošana), jasanem atbilde no sistemas isa laika perioda (piem., ne ilgak ka 1-3 sekundes).
+10. Nelielu kludu vai neparedzetu situaciju gadijuma sistemai jaspej korekti turpinat darbu vai apstradat kludu, neizraisot pilnigu sistemas apturešanu.
+11. Lietotaju paroles datubaze jaglaba šifreta (hashed) veida, izmantojot modernus un drošus algoritmus
+12. Javeic pamata aizsardziba pret biežakajiem timekla ievainojamibas veidiem (piemeram, Cross-Site Scripting, SQL injekcijas), izmantojot framework iebuvetas aizsardzibas funkcijas.
+13. Janodrošina droša lietotaju sesiju parvaldiba, lai noverstu sesiju nolaupišanu.
+14. Sistemai jabut saderigai un korekti jadarbojas ar jaunakajam popularako timekla parlukprogrammu versijam (piemeram, Google Chrome, Mozilla Firefox, Safari, Microsoft Edge). (Existing)
+15. Dizainam ir jabut viegli mainamam no lietotaja puses. 
+
+3. UZDEVUMA RISINAŠANAS LIDZEKLU IZVELES PAMATOJUMS
+      Majasdarbu parvaldes sistema "KasKurKa" ir timekla lietojumprogramma, kas izstradata, lai studenti butu spejigi efektivi parvaldit sava kursa majasdarbus un saistito informaciju. Ta sastav no divam galvenajam dalam: lietotaja saskarnes (frontend) un servera dalas (backend).
+       Lietotaja saskarnes izstrade tiks pielietots Vue.js, moderns JavaScript ietvars, kas lauj veidot interaktivas un responsivas lietotaja saskarnes. Vue.js komponentu balstita arhitektura nodrošina efektivu koda organizaciju un atkartotu izmantošanu, veicinot atras un dinamiskas vienlapas lietojumprogrammas (SPA) izveidi, kas uzlabo kopejo lietotaja pieredzi, parvaldot majasdarbu sarakstus un informaciju par parbaudes darbiem.
+       Servera puses izstrade, savukart, tiks izmantots Node.js ka izpildes vide kopa ar Express.js ietvaru, kas nodrošina atru un elastigu API izveidi, apstradajot lietotaju pieprasijumus un parvaldot sistemas logiku, piemeram, jaunu majasdarbu ierakstu pievienošanu vai esošo redigešanu. Datu glabašanai un parvaldibai tiks izmantota PostgreSQL relaciju datu bazes parvaldibas sistema, kas nodrošina datu integritati, uzticamibu un efektivu piekluvi informacijai par majasdarbiem, lietotajiem un citiem sistemas datiem. Sistemas izstrades procesa tiks izmantots Docker, lai nodrošinatu lietojumprogrammas konteinerizaciju, kas veicina konsekventu vidi visos izstrades posmos un vienkaršo izversumu. Koda versiju kontrolei un sadarbibai tiks izmantots GitHub, kas lauj efektivi parvaldit izmainas un saglabat projekta vesturi. 
+4. PROGRAMMATURAS PRODUKTA MODELEŠANA UN PROJEKTEŠANA
+4.1. Sistemas strukturas modelis
+4.1.1. Sistemas arhitektura
+      Sistema tiks veidota no cetram apakšsistemam (skat. att): Lietotaju parvaldiba, Macibu satura parvaldiba, Grupu/Kursu parvaldiba, Informacijas apskate un sadarbiba.
+      
+
+
+1. Lietotaju Parvaldiba (Registracija un Autorizacija, Lietotaju Kontu Administrešana, Personiga Profila Parvaldiba)
+Šis modulis atbild par visam darbibam, kas saistitas ar lietotaju kontiem un piekluvi sistemai.
+2. Macibu Satura Parvaldiba (Majasdarbu Pievienošana un Parvaldiba, Parbaudes Darbu Informacijas Pievienošana un Parvaldiba, Satura Moderešana)
+Šis modulis aptver visas funkcijas, kas saistitas ar majasdarbu un parbaudes darbu informacijas izveidi, parvaldibu un moderešanu.
+3. Grupu/Kursu Parvaldiba (Grupu/Kursu Izveide un Administrešana, Daliba Grupas/Kursos)
+Šis modulis nodrošina funkcionalitati, kas saistita ar macibu grupu vai kursu izveidi, parvaldibu un studentu dalibu tajos.
+4. Informacijas Apskate un Sadarbiba (Macibu Satura Apskate, Komentešana un Atgriezeniska Saite)
+Šis modulis fokusejas uz centralizetu informacijas pieejamibu un lietotaju savstarpejo sadarbibu.
+4.1.2. Sistemas ER modelis
+      Sistemas apstradajamo datu konceptualais modelis ir attelots ER diagramma (skat. att) kas veidota Cena notacija. 
+      
+      ER-modelis demonstre entitiju savstarpejo saistibu:
+* Starp LIETOTAJS un LOMA ir attieciba N-1, jo vairakiem lietotajiem var but 1 loma, bet viena un ta pati loma var piemitet vairakiem lietotajiem.
+* Starp LIETOTAJS un GRUPA ir attieciba N-M, jo lietotajs var piederet vairakam grupam un grupa ir vairaki lietotaji.
+* Starp LIETOTAJS un IERAKSTS ir attieciba 1-N, jo viens lietotajs var izveidot daudzus majasdarbu vai parbaudes darbu ierakstus, bet katrs ieraksts pieder tikai vienam lietotajam.
+* Starp IERAKSTS un PRIEKŠMETS ir attieciba N-1, jo vairaki ieraksti var but par vienu un to pašu priekšmetu, bet viens ieraksts pieder tikai vienam konkretam priekšmetam.
+* Starp LIETOTAJS un KOMENTARS ir attieciba 1-N, jo viens lietotajs var uzrakstit vairakus komentarus, bet katru konkreto komentaru raksta viens lietotajs.
+* Starp KOMENTARS un IERAKSTS ir attieciba N-1, jo vienam ierakstam var but vairaki komentari, bet viens komentars attiecas tikai uz vienu ierakstu.
+* Starp IERAKSTS un PIELIKUMS ir attieciba 1-N, jo viens ieraksts var saturet vairakus pielikumus, bet viens konkrets pielikums pieder tikai vienam ierakstam.
+* Starp LIETOTAJS un IERAKSTS ir attieciba N-M, jo viens lietotajs var veikt vairakus ierakstus par progresu un vairaki lietotaji var veikt vienu un to pašu ierakstu par progresu.
+4.1.3. Datu plusmu modelis
+      Šaja sadala tiek atteloti datu plusmu modeli svarigakajiem "KasKurKa" sistemas moduliem. 
+1. Lietotaja Registracijas Modulis (skat att.)
+
+Students pievieno registracijas datus. Tad tiek parbaudits vai parole ir pietiekami sarežgita, vai grupa ir pareizi uzrakstita un vai sakuma gads ir derigs. Pec tam tiek parbaudits vai e-pasts jau tiek izmantots kada cita konta ietvaros. Ja kads no procesiem bija neveiksmigs, tiek izvadits kludas zinojums, citadi lietotajs tiek registrets.
+
+
+2. Lietotaja Pieteikšanas Modulis (skat att.)
+
+Lietotajs iesniedz pieteikšanas datus. Tad datubaze parbauda vai lietotaja iesniegtie dati sakrit ar korektajiem datiem. Ja dati sakrit, tad lietotajs tiek apstiprinats un tam tiek izvirzits attiecigs pazinojums. Ja dati nesakrit, tad lietotajs netiek apstiprinats un tam tiek novirzits pazinojums par atteikumu.
+3. Majasdarba Pievienošanas Modulis (skat att.)
+
+Students iesniedz majasdarba datus. Tad tiek parbaudits vai iesniegums atbilst datu formatam, nepieciešamajiem laukiem. Ja atbilst, tad majasdarbs tiek saglabats datubaze un tiek nodots apstiprinajums. Ja neatbilst, tad tiek nodota klume.
+4. Majasdarbu/Parbaudes darbu Apskates Modulis (skat att.)
+
+
+
+
+Students veic pieprasijumu apskatit sarakstu ar darbiem, iesniedzot informaciju par ta kartošanu. Apstradašanas logika nodod šo pieprasijumu datubazei. Datubaze atgriež datus uz apstradašanas logiku, kura tos vizualize skaistaka formata un atgriež lietotajam formatetu sarakstu.
+5. Jaunas grupas Izveidošanas Modulis (skat att.)
+
+Administrators veic pieprasijumu grupas izveidei ieklaujot nosaukumu, aprakstu un macibu gadu. Pieprasijums tiek nodots datubazei, datubaze apstrada šo pieprasijumu. Ja tada grupa neeksiste, tad administrators sanem grupas pieprasijuma apstiprinajumu un šada grupa tiek izveidota. Ja tada grupa jau eksiste, tad administrators sanem klumes pazinojumu.
+6. Majasdarba izpildes atzimešanas Modulis (skat att.)
+
+Students veic atzimešanas pieprasijumu kopa ar to iesniedzot majasdarba ID, programmatura nodod pieprasijumu kopa ar lietotaja datiem lai izmainitu atzimejuma statusu. Datubaze nodod apstiprinajumu par veikto darbibu un nodod informaciju par jauna skata izskatu. Programmatura nodod apstiprinajumu lietotajam un atjauno skatu.
+7. Komentara pievienošanas Modulis (skat att.)
+
+Students veic komentara pievienošanas pieprasijumu nododot ta informaciju. Komentara pievienošanas logika pieprasa lai datubaze saglaba jauno komentaru un nodod Majasdarba autora ID. Datubaze nodod jauno skatu, apstiprinajumu un Majasdarba autora ID. Komentara pievienošanas logika nodod pazinojumu Majasdarba autoram. Komentara pievienošanas logika nodod jauno skatu un apstiprinajumu studentam.
+8. Parejo Modulu apraksts
+8.1.  Izrakstišanas Modulis
+Lietotajs, kurš ir pieteicies sistema, izvelas opciju izrakstities. Sistema partrauc lietotaja sesiju, dzešot sesijas datus, un novirza lietotaju uz pieteikšanas lapu vai sakumlapu. Pec izrakstišanas piekluve sistemas aizsargatajam dalam tiek liegta lidz nakamajai veiksmigai pieteikšanas reizei.
+8.2.  Lietotaju saraksta apskates Modulis
+Administrators sistema izvelas funkciju, lai apskatitu visus registretos lietotajus. Sistema no datubazes atlasa informaciju par lietotajiem (piemeram, vards, uzvards, e-pasts, loma, piesaistita grupa, ja tada ir). Ši informacija tiek attelota administratoram struktureta saraksta, iespejams, ar meklešanas un kartošanas opcijam.
+8.3.  Lietotaja profila redigešanas Modulis
+Administrators no lietotaju saraksta izvelas konkretu lietotaju, kura datus nepieciešams rediget. Sistema ielade un attelo formu ar ši lietotaja aktualajiem profila datiem. Administrators veic nepieciešamas izmainas (piemeram, vards, uzvards, e-pasts, piesaistita grupa) un apstiprina tas. Sistema parbauda ievadito datu pareizibu un saglaba atjauninato informaciju datubaze. Administrators sanem pazinojumu par veiksmigu datu saglabašanu vai kludas zinojumu.
+8.4.  Lietotaja dzešanas Modulis
+Administrators no lietotaju saraksta izvelas konkretu lietotaju, kuru nepieciešams dzest no sistemas. Sistema pieprasa administratoram apstiprinajumu dzešanas darbibas veikšanai, lai noverstu nejaušu datu zudumu. Ja administrators apstiprina dzešanu, sistema neatgriezeniski dzeš lietotaja kontu un ar to saistitos datus no datubazes. Administrators sanem pazinojumu par veiksmigu dzešanu.
+8.5.  Lietotaja lomu parvaldibas Modulis
+Administrators izvelas konkretu lietotaju no saraksta, lai parvalditu ta lomas sistema. Sistema attelo lietotaja pašreizejo lomu (vai lomas) un piedava iespeju to mainit (piemeram, no "students" uz "administrators" vai pieškirt papildu lomas, ja sistema to atbalsta). Pec administratora izveles un apstiprinajuma, sistema saglaba jaunas lomas iestatijumus datubaze, un lietotajs iegust jaunajai lomai atbilstošas piekluves tiesibas.
+8.6.  Personiga profila datu apskates Modulis
+Lietotajs, esot pieteicies sistema, izvelas apskatit savu personigo profilu. Sistema no datubazes atlasa un attelo lietotaja informaciju, piemeram, vardu, uzvardu, e-pasta adresi, piesaistito grupu/kursu, macibu sakuma gadu un citus profila saglabatos datus. No ši skata lietotajam var but ari iespeja veikt sava profila datu redigešanu.
+8.7.  Paša veidota majasdarba redigešanas Modulis
+Lietotajs no majasdarbu saraksta izvelas paša iepriekš pievienotu majasdarbu, kuru velas rediget. Sistema ielade majasdarba esošos datus (piemeram, priekšmets, apraksts, terminš, pievienotas saites vai faili) un attelo tos redigešanas forma. Lietotajs veic nepieciešamas izmainas un apstiprina tas. Sistema parbauda ievadito datu korektumu un saglaba atjauninato majasdarba informaciju datubaze. Atjaunotais ieraksts tiek paradits kopeja majasdarbu saraksta.
+8.8.  Paša veidota majasdarba dzešanas Modulis
+Lietotajs no majasdarbu saraksta izvelas paša iepriekš pievienotu majasdarbu, kuru velas dzest. Sistema pieprasa lietotajam apstiprinajumu dzešanas veikšanai. Ja lietotajs apstiprina dzešanu, sistema neatgriezeniski nonem majasdarba ierakstu no datubazes.
+8.9.  Jauna parbaudes darba informacijas pievienošanas Modulis
+Autorizets lietotajs (students) izvelas pievienot informaciju par jaunu parbaudes darbu. Sistema attelo formu, kura lietotajs ievada nepieciešamos datus: macibu priekšmetu, norises datumu, laiku, parbaudes darba temas, formatu un citu butisku informaciju. Pec datu ievades un iesniegšanas, sistema parbauda obligato lauku aizpildišanu un datu formatu korektumu. Ja dati ir korekti, sistema saglaba jauno parbaudes darba ierakstu datubaze, sasaistot to ar lietotaju un vina kursu/grupu. Lietotajs sanem pazinojumu par veiksmigu pievienošanu, un jaunais ieraksts paradas kopeja parbaudes darbu saraksta.
+8.10. Parbaudes darba informacijas redigešanas Modulis
+Lietotajs no parbaudes darbu saraksta izvelas paša iepriekš pievienotu parbaudes darba ierakstu, kuru velas rediget. Sistema iegust ieraksta esošos datus un attelo tos redigešanas forma. Lietotajs veic nepieciešamas izmainas un apstiprina tas. Sistema parbauda ievadito datu korektumu un saglaba atjauninato informaciju datubaze. Atjaunotais ieraksts tiek paradits kopeja saraksta.
+8.11. Parbaudes darba informacijas dzešanas Modulis
+Lietotajs no parbaudes darbu saraksta izvelas paša iepriekš pievienotu parbaudes darba ierakstu, kuru velas dzest. Sistema pieprasa lietotajam apstiprinajumu dzešanas veikšanai. Ja lietotajs apstiprina dzešanu, sistema neatgriezeniski nonem ierakstu no datubazes. Pec dzešanas ieraksts vairs nav redzams saraksta.
+8.12. Satura moderešanas Modulis
+Administrators pieklust sistemas sadalai, kas paredzeta studentu pievienota satura (majasdarbi, komentari) parskatišanai. Sistema attelo sarakstu ar satura vienumiem, kas gaida moderaciju, vai visu nesen pievienoto saturu. Administrators var apskatit katra satura vienuma detalas, lai novertetu ta atbilstibu.
+8.13. Grupas informacijas redigešanas Modulis
+Administrators no sistema esošo grupu saraksta izvelas konkretu grupu, kura informaciju nepieciešams rediget. Sistema ielade un attelo formu ar izveletas grupas aktualajiem datiem (piemeram, nosaukums, apraksts, macibu gads). Administrators veic nepieciešamas izmainas un apstiprina tas. Sistema parbauda ievadito datu korektumu (piemeram, nosaukuma unikalitati) un saglaba atjauninato informaciju datubaze.
+8.14. Grupas dzešanas Modulis
+Administrators no sistema esošo grupu saraksta izvelas konkretu grupu/kursu, kuru nepieciešams dzest. Sistema pieprasa administratoram apstiprinajumu dzešanas darbibas veikšanai, iespejams, bridinot par sekam (piemeram, ka visi piesaistitie studenti zaudes piekluvi šis grupas saturam). Ja administrators apstiprina dzešanu, sistema neatgriezeniski dzeš grupas/kursa datus no datubazes.
+8.15. Pieteikšanas uz grupu Modulis
+Lietotajs sistema mekle pieejamas grupas. Atradis sev nepieciešamo grupu, lietotajs izvelas tai pieteikties. Sistema registre šo pieteikumu un nosuta to administratoram apstiprinašanai. Lietotajs sanem pazinojumu, ka vina pieteikums ir pienemts izskatišanai.
+8.16. Grupas pieteikumu apstiprinašanas Modulis
+Administrators sanem pazinojumus par jauniem studentu pieteikumiem dalibai grupas vai pieklust sarakstam ar visiem neapstiprinatajiem pieteikumiem. Katram pieteikumam administrators var apskatit studenta informaciju un grupas informaciju. Balstoties uz to, administrators pienem lemumu - apstiprinat vai noraidit pieteikumu. Ja pieteikums tiek apstiprinats, students tiek piesaistits attiecigajai grupai. Ja noraidits, students netiek piesaistits. Sistema informe studentu par administratora pienemto lemumu.
+8.17. Studentu piesaistišana/nonemšana no grupas Modulis
+Administrators var manuali parvaldit studentu dalibu grupas/kursos. Administrators izvelas konkretu grupu un tad var pievienot tai studentus no kopeja lietotaju saraksta vai nonemt esošos studentus no šis grupas. Veicot piesaisti, students tiek pievienots grupas dalibnieku sarakstam un iegust piekluvi tas saturam. Veicot nonemšanu, students tiek iznemts no saraksta un zaude piekluvi. Sistema saglaba šis izmainas datubaze.
+8.18. Satura filtrešanas Modulis
+Lietotajs, apskatot majasdarbu un parbaudes darbu sarakstu, izmanto filtrešanas opcijas, lai atlasitu ierakstus pec specifiskiem kriterijiem. Lietotajs var noradit vienu vai vairakus filtrus, piemeram, macibu priekšmetu, izpildes/norises termina diapazonu, ieraksta tipu (majasdarbs/parbaudes darbs) vai personigo izpildes statusu (izpildits/neizpildits majasdarbiem). Pec filtru piemerošanas sistema no datubazes atlasa un attelo tikai tos ierakstus, kas atbilst noraditajiem kriterijiem.
+8.19. Satura kartošanas Modulis
+Lietotajs, apskatot majasdarbu un parbaudes darbu sarakstu, izmanto kartošanas opcijas, lai sakartotu redzamos ierakstus pec noteikta atributa. Lietotajs var izveleties kartošanas lauku (piemeram, izpildes/norises terminš, pievienošanas datums, macibu priekšmets) un kartošanas virzienu (augoša vai dilstoša seciba). Pec kartošanas kriteriju piemerošanas sistema attiecigi parkarto un attelo ierakstu sarakstu.
+8.20. Detalizetas ieraksta informacijas apskates Modulis
+Lietotajs no majasdarbu vai parbaudes darbu saraksta izvelas konkretu ierakstu, lai apskatitu ta pilno informaciju. Sistema no datubazes ielade un attelo visu pieejamo informaciju par šo ierakstu, kas var ietvert pilnu uzdevuma aprakstu, pievienotaja informaciju, pievienošanas datumu, izpildes terminu, pievienotos failus, saites, ka ari citu lietotaju pievienotos komentarus vai labojumu ierosinajumus, ja tadi ir.
+8.21. Labojumu ierosinašanas Modulis
+Lietotajs, apskatot cita kursabiedra pievienotu majasdarba vai parbaudes darba ierakstu, pamana neprecizitati, nepilnibu vai velas ieteikt uzlabojumu. Lietotajam ir iespeja pievienot labojuma ierosinajumu šim ierakstam. Vinš var tekstuali aprakstit ieteicamos labojumus. Sistema registre šo ierosinajumu un pazino par to ieraksta autoram un/vai administratoram. Ieraksta autors vai administrators var izskatit ierosinajumu un veikt attiecigas izmainas ieraksta.
+5. DATU STRUKTURU APRAKSTS
+      Datubazes izveidošanai ir nepieciešama datubazes fiziska struktura. Ta tika ieguta normalizejot ER diagrammu, kuras rezultata no entitijam izveidoja relacijas. Sistemas "KasKurKa" datubaze sastav no 10 tabulam, kuras satur informaciju par lietotajiem, to lomam, macibu grupam, majasdarbiem un parbaudes darbiem, macibu priekšmetiem, ierakstiem pievienotajiem pielikumiem, komentariem, ka ari lietotaju personigo progresu attieciba uz ierakstu izpildi.
+* Lomas: Glaba informaciju par dažadam lietotaju lomam, nosakot to piekluves tiesibas.
+* Lietotaji: Glaba registreto lietotaju datus.
+* Grupas: Glaba informaciju par macibu grupam.
+* LietotajuGrupas: Saista lietotajus ar grupam.
+* Prieksmeti: Glaba informaciju par macibu priekšmetiem.
+* Ieraksti: Glaba detalizetu informaciju par majasdarbiem un parbaudes darbiem.
+* IerakstuGrupas: Saista ierakstus ar grupam.
+* Pielikumi: Glaba informaciju par failiem.
+* Komentari: Glaba lietotaju rakstitos komentarus.
+* LietotajuIerakstuProgress: Glaba informaciju par katra lietotaja personigo progresu attieciba uz ierakstu izpildi.
+NAV NORADES 7.tabule and stuff
+Tabulas "Lomas" struktura
+NrLauka nosaukumsTipsIzmersApraksts      1.LomaIDINTLomas identifikators      2.NosaukumsVARCHAR50Lomas nosaukums      
+Tabula Lomas ir saistita ar tabulu Lietotaji caur lauku LomaID. 
+Tabulas "Lietotaji" struktura
+NrLauka nosaukumsTipsIzmersApraksts      1.LietotajsIDINTLietotaja identifikators      2.VardsVARCHAR30Lietotaja vards      3.UzvardsVARCHAR30Lietotaja uzvards      4.EpastsVARCHAR255Lietotaja e-pasta adrese      5.ParolesHASHVARCHAR255Lietotaja paroles hash      6.SakumaGadsINTGads, kad lietotajs uzsaka macibas      7.LomaIDINTAtsauce uz lietotaja lomu      Saistita ar tabulam Loma caur LomaID, Ieraksts caur AutorsID, Komentars caur AutorsID, LietotajsGrupa caur LietotajsID, LietotajsIerakstsProgress caur LietotajsID. 
+Tabulas "Grupas" struktura
+NrLauka nosaukumsTipsIzmersApraksts      1.GrupaIDINTGrupas identifikators      2.NosaukumsVARCHAR50Grupas nosaukums      3.AprakstsTEXTDetalizets grupas apraksts      4.MacibuGadsVARCHAR9Grupas macibu gads      Saistita ar tabulam LietotajsGrupa caur GrupaID, IerakstsGrupa caur GrupaID.
+Tabulas "LietotajuGrupas" struktura
+NrLauka nosaukumsTipsIzmersApraksts      1.LietotajsIDINTAtsauce uz lietotaju      2.GrupaIDINTAtsauce uz grupu       Nodrošina, ka katrs lietotajs katrai grupai var but piesaistits tikai vienu reizi.
+Tabulas "Prieksmeti" struktura
+NrLauka nosaukumsTipsIzmersApraksts      1.PrieksmetsIDINTPriekšmeta identifikators      2.NosaukumsVARCHAR50Priekšmeta nosaukums      Saistita ar tabulu Ieraksts caur PrieksmetsID.
+Tabulas "Ieraksti" struktura
+NrLauka nosaukumsTipsIzmersApraksts      1.IerakstsIDINTIeraksta identifikators      2.AutorsIDINTAtsauce uz ieraksta autoru      3.PrieksmetsIDINTAtsauce uz priekšmetu      4.AprakstsTEXTDetalizets ieraksts apraksts      5.TerminsDATEIeraksta izpildes terminš, vai norises datums      6.TipsVARCHAR20Ieraksta tips (Majasdarbs, Parbaudes darbs)      7.IzveidesDatumsTIMESTAMPIzveides datums un laiks      8.PapildusInfoTEXTPapildus informacija par ierakstu (piem., norade uz mutisku uzdevumu)      Saistita ar tabulam Lietotajs caur AutorsID, Prieksmets caur PrieksmetsID, Pielikums caur IerakstsID, Komentars caur IerakstsID, IerakstuGrupas caur IerakstsID, LietotajsIerakstsProgress caur IerakstsID.
+Tabulas "IerakstuGrupas" struktura
+NrLauka nosaukumsTipsIzmersApraksts      1.IerakstsIDINTAtsauce uz ierakstu      2.GrupaIDINTAtsauce uz grupu      Nodrošina, ka katrs ieraksts katrai grupai var but piesaistits tikai vienu reizi.
+
+Tabulas "Pielikumi" struktura
+NrLauka nosaukumsTipsIzmersApraksts      1.PielikumsIDINTPielikuma identifikators      2.IerakstsIDINTAtsauce uz ierakstu      3.FailsURLVARCHAR255Faila nosaukums vai URL adrese      4.TipsVARCHAR50Pielikuma tips (piem., fails, saite)      Saistita ar Ieraksts caur IerakstsID.
+
+Tabulas "Komentari" struktura
+NrLauka nosaukumsTipsIzmersApraksts      1.KomentarsIDINTKomentara identifikators      2.IerakstsIDINTAtsauce uz ierakstu kuram pieder komentars      3.AutorsIDINTAtsauce uz autoru      4.TekstsTEXTKomentara saturs      5.IzveidesDatumsTIMESTampDatums un laiks, kad komentars tika izveidots      Saistita ar Ieraksts caur IerakstsID, saistita ar Lietotajs caur AutorsID.
+Tabulas "LietotajuIerakstuProgress" struktura
+NrLauka nosaukumsTipsIzmersApraksts      1.LietotajsIDINTAtsauce uz lietotaju      2.IerakstsIDINTAtsauce uz ierakstu      3.StatussVARCHAR20Lietotaja personigais statuss      Nodrošina, ka katram lietotajam par katru ierakstu var but tikai viens progresa statuss.
+
+Att. datu bazes tabulu saišu shema
+      2
+      
+      
