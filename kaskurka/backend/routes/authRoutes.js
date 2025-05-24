@@ -1,8 +1,8 @@
-// kaskurka/backend/routes/authRoutes.js
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { getDB } = require('../config/db');
+const { ObjectId } = require('mongodb'); // Added ObjectId
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 
@@ -19,15 +19,12 @@ router.post('/register', async (req, res) => {
     password,
     studyStartYear,
     group,
-    subgroup,
   } = req.body;
 
-  // Basic validation (Matches 2.2.1 requirements from Kvalifikacijas_darbs.txt)
   if (!firstName || !lastName || !email || !password || !studyStartYear || !group) {
     return res.status(400).json({ msg: 'Lūdzu, aizpildiet visus obligātos laukus.' });
   }
 
-  // Password complexity check from spec 2.2.1
   const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
   if (!passwordRegex.test(password)) {
     return res.status(400).json({
@@ -35,12 +32,10 @@ router.post('/register', async (req, res) => {
     });
   }
 
-
   try {
     const db = getDB();
     const usersCollection = db.collection('users');
 
-    // Check if user already exists
     let userCheck = await usersCollection.findOne({ email: email.toLowerCase() });
     if (userCheck) {
       return res.status(400).json({ msg: 'Lietotājs ar šādu e-pastu jau eksistē.' });
@@ -50,29 +45,29 @@ router.post('/register', async (req, res) => {
       firstName,
       lastName,
       email: email.toLowerCase(),
-      password, // Will be hashed
+      password,
       studyStartYear: parseInt(studyStartYear, 10),
-      group,
-      subgroup: subgroup || '',
+      group, // This is the display group from registration
       createdAt: new Date(),
-      role: 'student', // Default role as per spec 2.1.1
+      role: 'student',
+      enrolledCustomGroups: [], // Initialize as empty array
     };
 
     const salt = await bcrypt.genSalt(10);
     newUser.password = await bcrypt.hash(password, salt);
 
     const result = await usersCollection.insertOne(newUser);
-    
+
     const registeredUser = {
-        _id: result.insertedId, 
-        firstName: newUser.firstName,
-        lastName: newUser.lastName,
-        email: newUser.email,
-        studyStartYear: newUser.studyStartYear,
-        group: newUser.group,
-        subgroup: newUser.subgroup,
-        role: newUser.role,
-        createdAt: newUser.createdAt
+      _id: result.insertedId,
+      firstName: newUser.firstName,
+      lastName: newUser.lastName,
+      email: newUser.email,
+      studyStartYear: newUser.studyStartYear,
+      group: newUser.group,
+      role: newUser.role,
+      enrolledCustomGroups: newUser.enrolledCustomGroups,
+      createdAt: newUser.createdAt
     };
 
     res.status(201).json({ msg: 'Reģistrācija veiksmīga!', user: registeredUser });
@@ -108,36 +103,47 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ msg: 'Nepareizs e-pasts vai parole.' });
     }
 
+    // Prepare enrolledCustomGroupsDetails for the HTTP response
+    let enrolledCustomGroupsDetails = [];
+    if (user.enrolledCustomGroups && user.enrolledCustomGroups.length > 0) {
+      const groupObjectIds = user.enrolledCustomGroups.map(id => new ObjectId(id));
+      enrolledCustomGroupsDetails = await db.collection('groups')
+        .find({ _id: { $in: groupObjectIds } })
+        .project({ name: 1, _id: 1 }) // Only need ID and name for frontend display
+        .toArray();
+    }
+
     const payload = {
       user: {
-        id: user._id, 
+        id: user._id.toString(), // Ensure ID is string for JWT
         email: user.email,
         role: user.role,
         firstName: user.firstName,
-        studyStartYear: user.studyStartYear, // Added for homework/test context
-        group: user.group,                 // Added
-        subgroup: user.subgroup            // Added
+        studyStartYear: user.studyStartYear,
+        group: user.group, // Registration group
+        enrolledCustomGroupIds: user.enrolledCustomGroups ? user.enrolledCustomGroups.map(id => id.toString()) : [], // Store IDs in JWT
       },
     };
 
     jwt.sign(
       payload,
       process.env.JWT_SECRET,
-      { expiresIn: '5h' }, 
+      { expiresIn: '5h' },
       (err, token) => {
         if (err) throw err;
         res.json({
           token,
-          user: { 
-            id: user._id,
+          user: {
+            id: user._id.toString(),
             firstName: user.firstName,
             lastName: user.lastName,
             email: user.email,
             studyStartYear: user.studyStartYear,
-            group: user.group,
-            subgroup: user.subgroup,
+            group: user.group, // Registration group
             role: user.role,
-            createdAt: user.createdAt
+            createdAt: user.createdAt,
+            enrolledCustomGroups: user.enrolledCustomGroups ? user.enrolledCustomGroups.map(id => id.toString()) : [], // IDs for consistency
+            enrolledCustomGroupsDetails: enrolledCustomGroupsDetails, // Detailed objects for frontend
           }
         });
       }

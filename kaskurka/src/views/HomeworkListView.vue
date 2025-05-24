@@ -59,7 +59,7 @@
             <strong>Pievienotie Faili:</strong>
             <ul><li v-for="(file, index) in item.fileAttachments" :key="index">{{ file.originalName }} ({{ (file.size / 1024).toFixed(2) }} KB)</li></ul>
           </div>
-          <p class="item-author">Pievienoja: {{ item.userFirstName }} ({{ item.userGroup }}{{ item.userSubgroup ? '-' + item.userSubgroup : '' }})</p>
+          <p class="item-author">Pievienoja: {{ item.userFirstName }} ({{ item.userGroup }})</p> <!-- Removed item.userSubgroup -->
           <p class="item-added-date">Pievienots: {{ formatDate(item.createdAt, true) }}</p>
         </div>
         <div class="item-actions">

@@ -18,7 +18,8 @@
           >Admin Panelis</router-link
         >
         <div v-if="currentUser" class="user-greeting">
-          Sveiki, {{ currentUser.firstName }}!
+          Sveiki, {{ currentUser.firstName }}! ({{ currentUser.group }})
+          <!-- Display registration group -->
         </div>
       </div>
     </header>
@@ -40,7 +41,8 @@
           >Admin Panelis</router-link
         >
         <div v-if="currentUser" class="user-greeting">
-          Sveiki, {{ currentUser.firstName }}!
+          Sveiki, {{ currentUser.firstName }}! ({{ currentUser.group }})
+          <!-- Display registration group -->
         </div>
       </div>
     </header>
@@ -96,28 +98,30 @@
       <AddHomeworkView
         v-else-if="currentView === 'addHomework' && currentUser"
         :item-id-to-edit="editingItemId"
+        :current-user="currentUser"
         @itemActionSuccess="handleItemActionSuccess"
-        @navigateToDashboard="navigateToDashboard"
+        @navigateToDashboard="navigateToUserSpecificDashboard"
         @cancelEdit="cancelEditItem"
       />
       <AddTestView
         v-else-if="currentView === 'addTest' && currentUser"
         :item-id-to-edit="editingItemId"
+        :current-user="currentUser"
         @itemActionSuccess="handleItemActionSuccess"
-        @navigateToDashboard="navigateToDashboard"
+        @navigateToDashboard="navigateToUserSpecificDashboard"
         @cancelEdit="cancelEditItem"
       />
       <HomeworkListView
         v-else-if="currentView === 'homeworkList' && currentUser"
         :current-user-id="currentUser ? currentUser.id : null"
-        @navigateToDashboard="navigateToStudentDashboard"
+        @navigateToDashboard="navigateToUserSpecificDashboard"
         @editItem="navigateToEditItem"
         @itemDeleted="handleItemDeletedInList"
       />
       <GroupListView
         v-else-if="currentView === 'groupList' && currentUser"
         :current-user="currentUser"
-        @navigateToDashboard="navigateToStudentDashboard"
+        @navigateToDashboard="navigateToUserSpecificDashboard"
       />
 
       <!-- Admin Views -->
@@ -127,6 +131,7 @@
           currentUser &&
           currentUser.role === 'admin'
         "
+        :currentUser="currentUser"
         @logout="handleLogout"
         @navigateToCreateGroup="navigateToCreateGroup"
         @navigateToStudentDashboard="navigateToStudentDashboard"
@@ -193,6 +198,7 @@
 
       <div v-else-if="isLoadingAuth"><p>Notiek ielāde...</p></div>
       <div v-else></div>
+      <!-- Fallback empty div -->
     </main>
 
     <footer class="app-footer">
@@ -216,8 +222,8 @@ import CreateGroupView from "./views/CreateGroupView.vue";
 import ManageGroupApplicationsView from "./views/ManageGroupApplicationsView.vue";
 import ManageGroupsView from "./views/ManageGroupsView.vue";
 import EditGroupView from "./views/EditGroupView.vue";
-import ManageUsersView from "./views/ManageUsersView.vue"; // New import
-import EditUserView from "./views/EditUserView.vue"; // New import
+import ManageUsersView from "./views/ManageUsersView.vue";
+import EditUserView from "./views/EditUserView.vue";
 import axios from "axios";
 
 export default {
@@ -236,11 +242,11 @@ export default {
     ManageGroupsView,
     EditGroupView,
     ManageUsersView,
-    EditUserView, // Added new components
+    EditUserView,
   },
   data() {
     return {
-      currentView: "home",
+      currentView: "home", // Default to home if no auto-login
       currentUser: null,
       isLoadingAuth: true,
       dashboardRelatedViews: [
@@ -248,14 +254,14 @@ export default {
         "addHomework",
         "addTest",
         "homeworkList",
+        "groupList",
         "adminDashboard",
         "createGroup",
-        "groupList",
         "manageGroupApplications",
         "manageGroups",
         "editGroup",
         "manageUsers",
-        "editUser", // Added new admin views
+        "editUser",
       ],
       adminSpecificViews: [
         "adminDashboard",
@@ -264,12 +270,12 @@ export default {
         "manageGroups",
         "editGroup",
         "manageUsers",
-        "editUser", // Added new admin views
+        "editUser",
       ],
       editingItemId: null,
       editingItemType: null,
       editingGroupId: null,
-      editingUserId: null, // For editing users
+      editingUserId: null,
     };
   },
   created() {
@@ -287,33 +293,54 @@ export default {
       this.isLoadingAuth = true;
       const token = localStorage.getItem("token");
       const userString = localStorage.getItem("user");
+
       if (token && userString) {
         try {
           const user = JSON.parse(userString);
-          this.currentUser = user;
+          this.currentUser = user; // Includes enrolledCustomGroupsDetails
           axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-          if (user.role === "admin") {
+          // Initial view logic based on role if logged in
+          if (this.currentUser.role === "admin") {
+            // If currentView is not an admin view or student dash/list, go to admin dash
             if (
               !this.adminSpecificViews.includes(this.currentView) &&
-              this.currentView !== "dashboard" &&
-              this.currentView !== "homeworkList"
+              ![
+                "dashboard",
+                "homeworkList",
+                "addHomework",
+                "addTest",
+                "groupList",
+              ].includes(this.currentView)
             ) {
               this.currentView = "adminDashboard";
             }
           } else {
+            // student
+            // If currentView is an admin view, or not a known dashboard view, go to student dash
             if (
               this.adminSpecificViews.includes(this.currentView) ||
-              !this.dashboardRelatedViews.includes(this.currentView)
+              !this.dashboardRelatedViews.includes(this.currentView) ||
+              this.currentView === "home" // If was home, but now logged in
             ) {
               this.currentView = "dashboard";
             }
           }
         } catch (e) {
-          console.error("Auto-login error:", e);
-          this.handleLogout();
+          console.error("Auto-login error, clearing stored data:", e);
+          this.handleLogout(); // Clears local storage and redirects to home
         }
       } else {
-        this.currentView = "home";
+        // Not logged in, ensure view is public
+        if (
+          this.dashboardRelatedViews.includes(this.currentView) ||
+          this.adminSpecificViews.includes(this.currentView)
+        ) {
+          this.currentView = "home";
+        } else if (!this.currentView) {
+          // handles case if currentView was somehow null/undefined
+          this.currentView = "home";
+        }
+        // If currentView is already 'home', 'login', or 'register', it's fine.
       }
       this.isLoadingAuth = false;
     },
@@ -339,20 +366,12 @@ export default {
       }
       this.clearAllEditStates();
     },
-    navigateToDashboard() {
-      if (this.currentUser && this.currentUser.role === "student") {
-        this.currentView = "dashboard";
-      } else if (this.currentUser && this.currentUser.role === "admin") {
-        this.navigateToAdminDashboard();
-        return;
-      } else {
-        this.navigateToLogin();
-      }
-      this.clearAllEditStates();
-    },
+    // navigateToDashboard remains as is (directs to appropriate dashboard)
+
     navigateToStudentDashboard() {
+      // Explicitly go to student dashboard (e.g., for admin viewing as student)
       if (this.currentUser) {
-        this.currentView = "dashboard";
+        this.currentView = "dashboard"; // Student dashboard view name
       } else {
         this.navigateToLogin();
       }
@@ -365,18 +384,14 @@ export default {
       this.clearAllEditStates();
     },
     handleLoginSuccess(authData) {
-      this.currentUser = authData.user;
+      this.currentUser = authData.user; // authData.user now has enrolledCustomGroupsDetails
       localStorage.setItem("token", authData.token);
       localStorage.setItem("user", JSON.stringify(authData.user));
       axios.defaults.headers.common[
         "Authorization"
       ] = `Bearer ${authData.token}`;
-      if (this.currentUser.role === "admin") {
-        this.currentView = "adminDashboard";
-      } else {
-        this.currentView = "dashboard";
-      }
-      this.clearAllEditStates();
+
+      this.navigateToUserSpecificDashboard(); // This will set the correct dashboard view
     },
     handleLogout() {
       this.currentUser = null;
@@ -411,8 +426,9 @@ export default {
       }
     },
     cancelEditItem() {
+      // Called from AddHomeworkView/AddTestView when editing is cancelled
       this.clearAllEditStates();
-      this.navigateToHomeworkList();
+      this.navigateToHomeworkList(); // Go back to the list view
     },
     handleItemActionSuccess(message) {
       alert(message || "Darbība veiksmīga!");
@@ -429,6 +445,7 @@ export default {
     },
     handleItemDeletedInList(message) {
       alert(message || "Ieraksts dzēsts.");
+      // The list view should refresh itself after deletion.
     },
 
     navigateToGroupList() {
@@ -440,11 +457,12 @@ export default {
       }
     },
 
+    // Admin specific navigation
     navigateToAdminDashboard() {
       if (this.currentUser && this.currentUser.role === "admin") {
         this.currentView = "adminDashboard";
       } else {
-        this.showHome();
+        this.showHome(); // Or navigateToLogin if preferred for non-admins trying to access
       }
       this.clearAllEditStates();
     },
@@ -487,10 +505,9 @@ export default {
     },
     handleGroupUpdateSuccess(message) {
       alert(message || "Grupa veiksmīgi atjaunināta!");
-      this.navigateToManageGroups();
+      this.navigateToManageGroups(); // Go back to manage groups list
     },
     navigateToManageUsers() {
-      // New
       if (this.currentUser && this.currentUser.role === "admin") {
         this.currentView = "manageUsers";
       } else {
@@ -499,7 +516,6 @@ export default {
       this.clearAllEditStates();
     },
     navigateToEditUser(userId) {
-      // New
       if (this.currentUser && this.currentUser.role === "admin") {
         this.clearAllEditStates();
         this.editingUserId = userId;
@@ -509,9 +525,8 @@ export default {
       }
     },
     handleUserUpdateSuccess(message) {
-      // New
       alert(message || "Lietotāja dati veiksmīgi atjaunināti!");
-      this.navigateToManageUsers();
+      this.navigateToManageUsers(); // Go back to manage users list
     },
 
     clearAllEditStates() {

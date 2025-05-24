@@ -1,3 +1,4 @@
+<!-- kaskurka/src/views/RegisterView.vue -->
 <template>
   <div class="register-view form-view">
     <button @click="$emit('navigateHome')" class="back-button">
@@ -91,11 +92,12 @@
           id="group"
           v-model="formData.group"
           required
-          maxlength="3"
+          maxlength="10" 
         />
-        <small>Piemēram, DT3 (līdz 3 rakstzīmēm).</small>
+        <small>Piemēram, DT3 vai DP2-1 (līdz 10 rakstzīmēm).</small>
       </div>
 
+      <!-- Removed Subgroup Field
       <div class="form-group">
         <label for="subgroup">Apakšgrupa (nav obligāts):</label>
         <input
@@ -106,6 +108,7 @@
         />
         <small>Piemēram, 4 (līdz 2 rakstzīmēm).</small>
       </div>
+      -->
 
       <div v-if="errorMessage" class="error-message">{{ errorMessage }}</div>
       <!-- successMessage is handled by App.vue alert for now -->
@@ -136,7 +139,7 @@ export default {
         confirmPassword: "",
         studyStartYear: null,
         group: "",
-        subgroup: "",
+        // subgroup: "", // Removed subgroup
       },
       currentYear: currentYear,
       errorMessage: "",
@@ -196,29 +199,22 @@ export default {
       }
 
       if (
-        this.formData.studyStartYear < this.currentYear - 4 ||
-        this.formData.studyStartYear > this.currentYear
+        this.formData.studyStartYear < this.currentYear - 7 || // Increased range as per EditUserView
+        this.formData.studyStartYear > this.currentYear + 1
       ) {
         this.errorMessage = `Mācību sākuma gadam jābūt starp ${
-          this.currentYear - 4
-        } un ${this.currentYear}.`;
+          this.currentYear - 7
+        } un ${this.currentYear + 1}.`;
         this.isLoading = false;
         return;
       }
 
-      if (this.formData.group.length > 3) {
-        // Maxlength is also on input
-        this.errorMessage = "Grupas nosaukums nedrīkst pārsniegt 3 rakstzīmes.";
+      if (this.formData.group.length > 10) { // Maxlength updated
+        this.errorMessage = "Grupas nosaukums nedrīkst pārsniegt 10 rakstzīmes.";
         this.isLoading = false;
         return;
       }
-      if (this.formData.subgroup && this.formData.subgroup.length > 2) {
-        // Maxlength is also on input
-        this.errorMessage =
-          "Apakšgrupas nosaukums nedrīkst pārsniegt 2 rakstzīmes.";
-        this.isLoading = false;
-        return;
-      }
+      // Subgroup validation removed
 
       try {
         // Prepare data for API, exclude confirmPassword

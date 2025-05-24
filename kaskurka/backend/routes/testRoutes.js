@@ -1,4 +1,3 @@
-// kaskurka/backend/routes/testRoutes.js
 const express = require('express');
 const router = express.Router();
 const { getDB } = require('../config/db');
@@ -9,29 +8,57 @@ const { ObjectId } = require('mongodb');
 // @desc    Add a new test/examination entry
 // @access  Private
 router.post('/', authMiddleware, async (req, res) => {
-  const { subject, eventDate, eventTime, topics, format, additionalInfo } = req.body;
+  const { subject, eventDate, eventTime, topics, format, additionalInfo, customGroupId } = req.body; // Added customGroupId
   const errors = [];
   if (!subject || subject.trim() === '') errors.push('Mācību priekšmets ir obligāts lauks.');
   if (!eventDate) errors.push('Norises datums ir obligāts lauks.');
   else {
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
     if (!dateRegex.test(eventDate) || isNaN(new Date(eventDate).getTime())) {
-        errors.push('Norādītais norises datums nav korekts. Izmantojiet GGGG-MM-DD formātu.');
+      errors.push('Norādītais norises datums nav korekts. Izmantojiet GGGG-MM-DD formātu.');
     }
   }
   if (eventTime && !/^\d{2}:\d{2}$/.test(eventTime)) {
     errors.push('Norādītais laiks nav korekts. Izmantojiet HH:MM formātu.');
+  }
+  if (!customGroupId || !ObjectId.isValid(customGroupId)) {
+    errors.push('Nepieciešams norādīt derīgu grupu, kurai pievienot pārbaudes darbu.');
   }
   if (errors.length > 0) return res.status(400).json({ msg: errors[0] });
 
   try {
     const db = getDB();
     const testsCollection = db.collection('tests');
+    const usersCollection = db.collection('users');
+
+    const userCreating = await usersCollection.findOne({ _id: new ObjectId(req.user.id) });
+    if (!userCreating) {
+      return res.status(404).json({ msg: 'Lietotājs nav atrasts.' });
+    }
+
+    if (req.user.role === 'student') {
+      const enrolledIds = (userCreating.enrolledCustomGroups || []).map(id => id.toString());
+      if (!enrolledIds.includes(customGroupId)) {
+        return res.status(403).json({ msg: 'Jums nav tiesību pievienot pārbaudes darbu šai grupai.' });
+      }
+    } else if (req.user.role === 'admin') {
+      const groupExists = await db.collection('groups').findOne({ _id: new ObjectId(customGroupId) });
+      if (!groupExists) {
+        return res.status(400).json({ msg: 'Norādītā grupa neeksistē.' });
+      }
+    }
+
     const newTest = {
       subject, eventDate: new Date(eventDate), eventTime: eventTime || '', topics: topics || '',
-      format: format || '', additionalInfo: additionalInfo || '', userId: new ObjectId(req.user.id),
-      userFirstName: req.user.firstName, userGroup: req.user.group, userSubgroup: req.user.subgroup,
-      userStudyStartYear: req.user.studyStartYear, createdAt: new Date(), updatedAt: new Date(), type: 'test'
+      format: format || '', additionalInfo: additionalInfo || '',
+      userId: new ObjectId(req.user.id),
+      userFirstName: req.user.firstName,
+      userGroup: req.user.group, // Creator's registration group for display
+      userStudyStartYear: req.user.studyStartYear,
+      customGroupId: new ObjectId(customGroupId), // The custom group this item belongs to
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      type: 'test'
     };
     const result = await testsCollection.insertOne(newTest);
     const createdTest = await testsCollection.findOne({ _id: result.insertedId });
@@ -43,15 +70,28 @@ router.post('/', authMiddleware, async (req, res) => {
 });
 
 // @route   GET api/tests
-// @desc    Get all tests for the user's group
+// @desc    Get all tests relevant to the user
 // @access  Private
 router.get('/', authMiddleware, async (req, res) => {
   try {
     const db = getDB();
     const testsCollection = db.collection('tests');
-    const userGroup = req.user.group;
-    if (!userGroup) return res.status(400).json({ msg: 'Lietotāja grupa nav atrasta profilā.' });
-    const tests = await testsCollection.find({ userGroup: userGroup }).sort({ eventDate: -1 }).toArray();
+
+    let query = {};
+    if (req.user.role === 'student') {
+      const enrolledCustomGroupObjectIds = (req.user.enrolledCustomGroupIds || []).map(id => new ObjectId(id));
+      if (enrolledCustomGroupObjectIds.length === 0) {
+        return res.json([]); // Student not in any custom groups, sees no tests
+      }
+      query = { customGroupId: { $in: enrolledCustomGroupObjectIds } };
+    } else if (req.user.role === 'admin') {
+      // Admin sees all tests
+      query = {};
+    } else {
+      return res.status(403).json({ msg: "Nezināma lietotāja loma." });
+    }
+
+    const tests = await testsCollection.find(query).sort({ eventDate: -1 }).toArray();
     res.json(tests);
   } catch (err) {
     console.error('Error fetching tests:', err);
@@ -63,75 +103,109 @@ router.get('/', authMiddleware, async (req, res) => {
 // @desc    Get a single test item by ID
 // @access  Private
 router.get('/:id', authMiddleware, async (req, res) => {
-    try {
-        const db = getDB();
-        const testsCollection = db.collection('tests');
-        const testId = new ObjectId(req.params.id);
+  try {
+    const db = getDB();
+    const testsCollection = db.collection('tests');
 
-        const test = await testsCollection.findOne({ _id: testId });
-
-        if (!test) {
-            return res.status(404).json({ msg: 'Pārbaudes darbs nav atrasts.' });
-        }
-        res.json(test);
-    } catch (err) {
-        console.error('Error fetching single test:', err);
-        if (err.name === 'BSONError') return res.status(400).json({ msg: 'Nederīgs ID formāts.' });
-        res.status(500).json({ msg: 'Servera kļūda, ielādējot pārbaudes darbu.' });
+    if (!ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ msg: 'Nederīgs ID formāts.' });
     }
+    const testId = new ObjectId(req.params.id);
+    const test = await testsCollection.findOne({ _id: testId });
+
+    if (!test) {
+      return res.status(404).json({ msg: 'Pārbaudes darbs nav atrasts.' });
+    }
+
+    if (req.user.role === 'student') {
+      const enrolledCustomGroupIdsStrings = req.user.enrolledCustomGroupIds || [];
+      if (!test.customGroupId || !enrolledCustomGroupIdsStrings.includes(test.customGroupId.toString())) {
+        return res.status(403).json({ msg: 'Jums nav tiesību skatīt šo pārbaudes darbu.' });
+      }
+    }
+    // Admins can see any test by ID
+
+    res.json(test);
+  } catch (err) {
+    console.error('Error fetching single test:', err);
+    if (err.name === 'BSONError') return res.status(400).json({ msg: 'Nederīgs ID formāts.' });
+    res.status(500).json({ msg: 'Servera kļūda, ielādējot pārbaudes darbu.' });
+  }
 });
 
 // @route   PUT api/tests/:id
 // @desc    Update a test/examination entry
-// @access  Private (only owner)
+// @access  Private (only owner or admin)
 router.put('/:id', authMiddleware, async (req, res) => {
-  const { subject, eventDate, eventTime, topics, format, additionalInfo } = req.body;
+  const { subject, eventDate, eventTime, topics, format, additionalInfo, customGroupId } = req.body; // Added customGroupId
   const testId = req.params.id;
   const errors = [];
+
+  if (!ObjectId.isValid(testId)) {
+    return res.status(400).json({ msg: 'Nederīgs pārbaudes darba ID formāts.' });
+  }
 
   if (subject && subject.trim() === '') errors.push('Mācību priekšmets nevar būt tukšs.');
   if (eventDate) {
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
     if (!dateRegex.test(eventDate) || isNaN(new Date(eventDate).getTime())) {
-        errors.push('Norādītais datums nav korekts. Izmantojiet GGGG-MM-DD formātu.');
+      errors.push('Norādītais datums nav korekts. Izmantojiet GGGG-MM-DD formātu.');
     }
   }
-  if (eventTime && eventTime.trim() !== '' && !/^\d{2}:\d{2}$/.test(eventTime)) { // Allow empty time
+  if (eventTime && eventTime.trim() !== '' && !/^\d{2}:\d{2}$/.test(eventTime)) {
     errors.push('Norādītais laiks nav korekts. Izmantojiet HH:MM formātu.');
+  }
+  if (customGroupId && !ObjectId.isValid(customGroupId)) {
+    errors.push('Norādītais grupas ID nav derīgs.');
   }
   if (errors.length > 0) return res.status(400).json({ msg: errors[0] });
 
   try {
     const db = getDB();
     const testsCollection = db.collection('tests');
+    const usersCollection = db.collection('users');
     const itemObjectId = new ObjectId(testId);
 
     const existingTest = await testsCollection.findOne({ _id: itemObjectId });
     if (!existingTest) {
       return res.status(404).json({ msg: 'Pārbaudes darbs nav atrasts.' });
     }
-    if (existingTest.userId.toString() !== req.user.id) {
+
+    if (existingTest.userId.toString() !== req.user.id && req.user.role !== 'admin') {
       return res.status(403).json({ msg: 'Jums nav tiesību rediģēt šo ierakstu.' });
     }
 
     const updateFields = { updatedAt: new Date() };
     if (subject) updateFields.subject = subject;
     if (eventDate) updateFields.eventDate = new Date(eventDate);
-    if (typeof eventTime !== 'undefined') updateFields.eventTime = eventTime; // Can be empty string
+    if (typeof eventTime !== 'undefined') updateFields.eventTime = eventTime;
     if (typeof topics !== 'undefined') updateFields.topics = topics;
     if (typeof format !== 'undefined') updateFields.format = format;
     if (typeof additionalInfo !== 'undefined') updateFields.additionalInfo = additionalInfo;
 
+    if (customGroupId) {
+      if (req.user.role === 'student') {
+        const userCreating = await usersCollection.findOne({ _id: new ObjectId(req.user.id) });
+        const enrolledIds = (userCreating.enrolledCustomGroups || []).map(id => id.toString());
+        if (!enrolledIds.includes(customGroupId)) {
+          return res.status(403).json({ msg: 'Jums nav tiesību pārvietot pārbaudes darbu uz šo grupu.' });
+        }
+      } else if (req.user.role === 'admin') {
+        const groupExists = await db.collection('groups').findOne({ _id: new ObjectId(customGroupId) });
+        if (!groupExists) {
+          return res.status(400).json({ msg: 'Norādītā mērķa grupa neeksistē.' });
+        }
+      }
+      updateFields.customGroupId = new ObjectId(customGroupId);
+    }
+
     const result = await testsCollection.updateOne(
-      { _id: itemObjectId, userId: new ObjectId(req.user.id) },
+      { _id: itemObjectId },
       { $set: updateFields }
     );
-    
-    if (result.matchedCount === 0) {
-        return res.status(404).json({ msg: 'Pārbaudes darbs nav atrasts vai jums nav tiesību to rediģēt.' });
-    }
-    if (result.modifiedCount === 0) {
-        return res.json({ msg: 'Izmaiņas netika veiktas (iespējams, dati ir tādi paši).', test: existingTest });
+
+    if (result.matchedCount === 0) { // Should not happen if previous checks passed
+      return res.status(404).json({ msg: 'Pārbaudes darbs nav atrasts.' });
     }
 
     const updatedTest = await testsCollection.findOne({ _id: itemObjectId });
@@ -146,42 +220,39 @@ router.put('/:id', authMiddleware, async (req, res) => {
 
 // @route   DELETE api/tests/:id
 // @desc    Delete a test/examination entry
-// @access  Private (only owner)
-// kaskurka/backend/routes/testRoutes.js
-// ... (other routes remain the same) ...
-
-// @route   DELETE api/tests/:id
-// @desc    Delete a test/examination entry
-// @access  Private (only owner)
+// @access  Private (only owner or admin)
 router.delete('/:id', authMiddleware, async (req, res) => {
   const testId = req.params.id;
   try {
+    if (!ObjectId.isValid(testId)) {
+      return res.status(400).json({ msg: 'Nederīgs ID formāts.' });
+    }
     const db = getDB();
     const testsCollection = db.collection('tests');
     const progressCollection = db.collection('userItemProgress');
-    const commentsCollection = db.collection('comments'); // Added
+    const commentsCollection = db.collection('comments');
     const itemObjectId = new ObjectId(testId);
 
     const testToDelete = await testsCollection.findOne({ _id: itemObjectId });
     if (!testToDelete) {
       return res.status(404).json({ msg: 'Pārbaudes darbs nav atrasts.' });
     }
-    if (testToDelete.userId.toString() !== req.user.id) {
+
+    if (testToDelete.userId.toString() !== req.user.id && req.user.role !== 'admin') {
       return res.status(403).json({ msg: 'Jums nav tiesību dzēst šo ierakstu.' });
     }
 
     const deleteResult = await testsCollection.deleteOne({ _id: itemObjectId });
-    if (deleteResult.deletedCount === 0) {
+    if (deleteResult.deletedCount === 0) { // Should not happen
       return res.status(404).json({ msg: 'Pārbaudes darbs netika atrasts vai jau ir dzēsts.' });
     }
-    
+
     await progressCollection.deleteMany({ itemId: itemObjectId });
-    await commentsCollection.deleteMany({ itemId: itemObjectId }); // Added
+    await commentsCollection.deleteMany({ itemId: itemObjectId });
 
     res.json({ msg: 'Pārbaudes darbs veiksmīgi dzēsts.' });
   } catch (err) {
     console.error('Error deleting test:', err);
-    if (err.name === 'BSONError') return res.status(400).json({ msg: 'Nederīgs ID formāts.' });
     res.status(500).json({ msg: 'Servera kļūda, dzēšot pārbaudes darbu.' });
   }
 });

@@ -1,3 +1,4 @@
+// kaskurka/backend/routes/userRoutes.js
 const express = require('express');
 const router = express.Router();
 const { getDB } = require('../config/db');
@@ -50,7 +51,7 @@ router.get('/:userId', [authMiddleware, adminMiddleware], async (req, res) => {
 // @access  Private (Admin)
 router.put('/:userId', [authMiddleware, adminMiddleware], async (req, res) => {
     const { userId } = req.params;
-    const { firstName, lastName, email, role, studyStartYear, group, subgroup, newPassword } = req.body;
+    const { firstName, lastName, email, role, studyStartYear, group, /*subgroup,*/ newPassword } = req.body; // subgroup removed
 
     if (!ObjectId.isValid(userId)) {
         return res.status(400).json({ msg: 'Nederīgs lietotāja ID.' });
@@ -100,9 +101,15 @@ router.put('/:userId', [authMiddleware, adminMiddleware], async (req, res) => {
             role,
             studyStartYear: parseInt(studyStartYear, 10),
             group,
-            subgroup: subgroup || '', // Keep as empty string if not provided
+            // subgroup: subgroup || '', // subgroup removed
             updatedAt: new Date(),
         };
+
+        // Ensure subgroup is removed if it exists
+        if (Object.prototype.hasOwnProperty.call(userToUpdate, 'subgroup')) {
+            updateFields.$unset = { subgroup: "" };
+        }
+
 
         if (newPassword) {
             const salt = await bcrypt.genSalt(10);
@@ -170,9 +177,7 @@ router.delete('/:userId', [authMiddleware, adminMiddleware], async (req, res) =>
             { $set: { userName: `${userToDelete.firstName} (Dzēsts Lietotājs)`, originalUserId: userToDelete._id, userId: null } } // Anonymize
         );
         // 5. Handle user's created homework/tests (e.g., assign to a generic admin, mark as orphaned, or delete)
-        // For now, let's mark them with originalUserId and set userId to null or a generic admin.
-        // Or simply leave them, but they won't be editable by the deleted user.
-        // Let's assume for now that content created by users remains, attributed to their name.
+        // For now, let's assume for now that content created by users remains, attributed to their name.
         // If stricter deletion is needed, that would be more complex.
 
 

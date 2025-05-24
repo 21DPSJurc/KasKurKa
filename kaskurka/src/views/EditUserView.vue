@@ -1,3 +1,4 @@
+<!-- kaskurka/src/views/EditUserView.vue -->
 <template>
   <div class="form-view edit-user-view">
     <button @click="cancelEdit" class="back-button" :disabled="isLoading">
@@ -95,9 +96,10 @@
           maxlength="10"
           :disabled="isLoading"
         />
-        <small>Piemēram, DT3 (līdz 10 rakstzīmēm).</small>
+        <small>Piemēram, DT3 vai DP2-1 (līdz 10 rakstzīmēm).</small>
       </div>
 
+      <!-- Removed Subgroup Field
       <div class="form-group">
         <label for="subgroup">Apakšgrupa:</label>
         <input
@@ -109,6 +111,7 @@
         />
         <small>Piemēram, 1 vai P1 (līdz 5 rakstzīmēm).</small>
       </div>
+      -->
 
       <hr class="form-divider" />
       <h3>Paroles Maiņa (Neobligāti)</h3>
@@ -180,7 +183,7 @@ export default {
         role: "student",
         studyStartYear: currentYear,
         group: "",
-        subgroup: "",
+        // subgroup: "", // Removed subgroup
         newPassword: "",
         confirmNewPassword: "",
       },
@@ -222,7 +225,7 @@ export default {
         this.user.studyStartYear =
           response.data.studyStartYear || this.currentYear;
         this.user.group = response.data.group || "";
-        this.user.subgroup = response.data.subgroup || "";
+        // this.user.subgroup = response.data.subgroup || ""; // subgroup removed
         this.user.newPassword = ""; // Always clear password fields on load
         this.user.confirmNewPassword = "";
       } catch (error) {
@@ -306,7 +309,7 @@ export default {
         role: this.user.role,
         studyStartYear: parseInt(this.user.studyStartYear, 10),
         group: this.user.group.trim(),
-        subgroup: this.user.subgroup.trim(),
+        // subgroup: this.user.subgroup.trim(), // subgroup removed
       };
       if (this.user.newPassword) {
         updateData.newPassword = this.user.newPassword; // Backend will hash it
@@ -318,21 +321,17 @@ export default {
           updateData
         );
         this.successMessage = response.data.msg;
-        // Update current user in localStorage if admin is editing themselves (and role changed)
+        
         const loggedInUser = JSON.parse(localStorage.getItem("user"));
         if (loggedInUser && loggedInUser.id === this.userIdToEdit) {
           const updatedLoggedInUser = {
             ...loggedInUser,
             ...response.data.user,
-          }; // Use user data from response
+          }; 
+          delete updatedLoggedInUser.subgroup; // Ensure subgroup is removed if it was there
           localStorage.setItem("user", JSON.stringify(updatedLoggedInUser));
-          // Note: App.vue's currentUser won't auto-update from this. A full re-login or specific event
-          // would be needed if immediate App.vue currentUser update is critical after self-edit.
-          // For now, the next login will pick up the new details.
-          // If role changes for self, it might be better to force re-login or redirect.
         }
 
-        // Slight delay before navigating back to allow user to see success message
         setTimeout(() => {
           this.$emit("userUpdateSuccess", this.successMessage);
         }, 1500);
@@ -345,7 +344,6 @@ export default {
         }
         console.error("User update error:", error);
       } finally {
-        // Don't immediately turn off isLoading if success message is shown before navigation
         if (this.errorMessage) {
           this.isLoading = false;
         } else if (this.successMessage) {
