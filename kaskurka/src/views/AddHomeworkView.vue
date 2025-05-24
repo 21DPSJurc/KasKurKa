@@ -14,14 +14,14 @@
     <div v-if="isLoadingInitialData" class="loading-message">
       Notiek datu ielāde...
     </div>
-    <div v-else-if="!canAddOrEdit" class="error-message">
+    <div v-else-if="!canAddOrEditLogic" class="error-message">
       {{ addEditNotAllowedMessage }}
     </div>
 
     <form
       @submit.prevent="submitHomework"
       class="homework-form"
-      v-if="canAddOrEdit && !isLoadingInitialData"
+      v-if="canAddOrEditLogic && !isLoadingInitialData"
     >
       <div class="form-group">
         <label for="customGroupId"
@@ -50,7 +50,8 @@
             availableCustomGroups.length === 0
           "
           >Jums jābūt vismaz vienas grupas dalībniekam, lai pievienotu
-          mājasdarbu.</small
+          mājasdarbu. Mēģiniet vēlreiz ielādēt lapu vai sazinieties ar
+          administratoru, ja nesen tikāt pievienots jaunai grupai.</small
         >
         <small
           v-if="
@@ -197,9 +198,7 @@
         <button
           type="submit"
           class="action-button"
-          :disabled="
-            isLoading || (availableCustomGroups.length === 0 && !itemIdToEdit)
-          "
+          :disabled="isLoading || !canAddOrEditLogic"
         >
           {{
             isLoading
@@ -227,11 +226,11 @@ export default {
       default: null,
     },
     currentUser: {
-      // Passed from App.vue
       type: Object,
       required: true,
     },
   },
+  inject: ["refreshUser"], // Inject the refresh method from App.vue
   data() {
     const now = new Date();
     const year = now.getFullYear();
@@ -247,13 +246,13 @@ export default {
         links: "",
         selectedFileObjects: [],
         existingFileAttachments: [],
-        customGroupId: "", // ID of the custom group
+        customGroupId: "",
       },
       today: `${year}-${month}-${day}`,
       errorMessage: "",
       successMessage: "",
       isLoading: false,
-      isLoadingInitialData: false, // For loading groups or existing item
+      isLoadingInitialData: false,
       newFilesSelected: false,
       clearExistingFiles: false,
       allSystemGroups: [], // For admin to select from
@@ -263,16 +262,15 @@ export default {
     availableCustomGroups() {
       if (!this.currentUser) return [];
       if (this.currentUser.role === "admin") {
-        return this.allSystemGroups; // Admins see all groups
+        return this.allSystemGroups;
       }
-      // Students see groups they are enrolled in, with details
       return this.currentUser.enrolledCustomGroupsDetails || [];
     },
-    canAddOrEdit() {
+    canAddOrEditLogic() {
+      // Renamed from canAddOrEdit to avoid conflict with potential method
       if (!this.currentUser) return false;
-      if (this.itemIdToEdit) return true; // Can always attempt to edit if ID provided (backend validates ownership)
+      if (this.itemIdToEdit) return true; // Can always attempt to edit if ID provided
 
-      // For adding new:
       if (this.currentUser.role === "admin") {
         return this.allSystemGroups.length > 0;
       }
@@ -285,11 +283,12 @@ export default {
       return false;
     },
     addEditNotAllowedMessage() {
-      if (this.itemIdToEdit) return ""; // No message if editing (already loaded or loading)
+      if (this.itemIdToEdit) return "";
       if (
         this.currentUser &&
         this.currentUser.role === "admin" &&
-        this.allSystemGroups.length === 0
+        this.allSystemGroups.length === 0 &&
+        !this.isLoadingInitialData
       ) {
         return "Lai pievienotu mājasdarbu, vispirms sistēmā ir jāizveido vismaz viena grupa.";
       }
@@ -297,53 +296,82 @@ export default {
         this.currentUser &&
         this.currentUser.role === "student" &&
         (!this.currentUser.enrolledCustomGroupsDetails ||
-          this.currentUser.enrolledCustomGroupsDetails.length === 0)
+          this.currentUser.enrolledCustomGroupsDetails.length === 0) &&
+        !this.isLoadingInitialData
       ) {
-        return "Lai pievienotu mājasdarbu, Jums ir jābūt dalībniekam vismaz vienā grupā.";
+        return "Lai pievienotu mājasdarbu, Jums ir jābūt dalībniekam vismaz vienā grupā. Ja nesen tikāt pievienots, mēģiniet pārlādēt lapu vai doties atpakaļ uz paneli un atgriezties šeit.";
       }
-      return "Jums nav tiesību pievienot jaunus mājasdarbus.";
+      if (!this.isLoadingInitialData)
+        return "Jums nav tiesību pievienot jaunus mājasdarbus.";
+      return "Notiek datu ielāde...";
     },
   },
   watch: {
-    itemIdToEdit: {
-      immediate: true,
-      async handler(newVal) {
-        this.isLoadingInitialData = true;
-        await this.fetchRequiredDataForForm(); // Fetch groups if admin
-        if (newVal) {
-          await this.loadHomeworkForEditing(newVal);
-        } else {
-          this.resetForm();
-        }
-        this.isLoadingInitialData = false;
-      },
+    // Watch for itemIdToEdit changes after initial mount
+    itemIdToEdit(newVal, oldVal) {
+      if (newVal !== oldVal && !this.isLoadingInitialData) {
+        // Avoid running during initial mount if already handled
+        this.handleIdOrUserChange();
+      }
     },
-    currentUser: {
-      // If currentUser changes (e.g. after login), re-evaluate
-      immediate: true,
-      async handler() {
-        this.isLoadingInitialData = true;
-        await this.fetchRequiredDataForForm();
-        this.isLoadingInitialData = false;
-      },
-    },
+    // Watch for currentUser changes after initial mount (e.g., unlikely, but for robustness)
+    // currentUser(newVal, oldVal) {
+    //   if (newVal && newVal.id !== oldVal?.id && !this.isLoadingInitialData) {
+    //      this.handleIdOrUserChange();
+    //   }
+    // }
+  },
+  async mounted() {
+    await this.performInitialSetup();
   },
   methods: {
-    async fetchRequiredDataForForm() {
-      if (
-        this.currentUser &&
-        this.currentUser.role === "admin" &&
-        this.allSystemGroups.length === 0
-      ) {
+    async performInitialSetup() {
+      this.isLoadingInitialData = true;
+      this.errorMessage = "";
+      try {
+        if (this.refreshUser) {
+          await this.refreshUser(); // Ensures App.vue's currentUser is fresh
+        }
+        // currentUser prop is now updated
+        await this.handleIdOrUserChange();
+      } catch (error) {
+        console.error("Error during initial setup of AddHomeworkView:", error);
+        this.errorMessage =
+          "Kļūda ielādējot nepieciešamos datus. " + (error.message || "");
+      } finally {
+        this.isLoadingInitialData = false;
+      }
+    },
+    async handleIdOrUserChange() {
+      // This method is called after currentUser is fresh.
+      // It fetches additional data (like all groups for admin) and sets up the form.
+      if (this.currentUser && this.currentUser.role === "admin") {
+        await this.fetchAllSystemGroups();
+      }
+
+      if (this.itemIdToEdit) {
+        await this.loadHomeworkForEditing(this.itemIdToEdit);
+      } else {
+        this.resetForm();
+      }
+    },
+    async fetchAllSystemGroups() {
+      // Formerly part of fetchRequiredDataForForm
+      if (this.currentUser && this.currentUser.role === "admin") {
+        // Only fetch if not already loaded or if a refresh is needed
+        if (this.allSystemGroups.length > 0 && !this.itemIdToEdit) {
+          /* simple cache */
+        }
+
         try {
           const response = await axios.get("/api/groups");
           this.allSystemGroups = response.data;
         } catch (error) {
           console.error("Error fetching all groups for admin:", error);
           this.errorMessage = "Kļūda ielādējot grupu sarakstu administratoram.";
+          // Potentially re-throw or handle more gracefully
         }
       }
-      // Student's enrolledCustomGroupsDetails should come directly from currentUser prop
     },
     resetForm() {
       const now = new Date();
@@ -361,18 +389,19 @@ export default {
         customGroupId:
           this.availableCustomGroups.length === 1
             ? this.availableCustomGroups[0]._id
-            : "", // Auto-select if only one group
+            : "",
       };
       this.newFilesSelected = false;
       this.clearExistingFiles = false;
-      this.errorMessage = "";
+      // Do not clear general errorMessage here as it might be from initial load
+      // this.errorMessage = "";
       this.successMessage = "";
       const fileInput = document.getElementById("files");
       if (fileInput) fileInput.value = null;
     },
     async loadHomeworkForEditing(itemId) {
-      this.isLoading = true; // Use general isLoading for this part
-      this.errorMessage = "";
+      this.isLoading = true; // Use general isLoading for item-specific loading
+      // this.errorMessage = ""; // Keep existing error messages if any from parent loading
       this.successMessage = "";
       try {
         const response = await axios.get(`/api/homework/${itemId}`);
@@ -395,7 +424,8 @@ export default {
         console.error("Error loading homework for editing:", error);
         this.errorMessage =
           error.response?.data?.msg ||
-          "Kļūda ielādējot mājasdarba datus rediģēšanai.";
+          "Kļūda ielādējot mājasdarba datus rediģēšanai. " +
+            (this.errorMessage || ""); // Append to existing errors
         if (error.response?.status === 403 || error.response?.status === 404) {
           setTimeout(() => this.$emit("navigateToDashboard"), 2000);
         }
@@ -416,7 +446,7 @@ export default {
     handleFileUpload(event) {
       this.homework.selectedFileObjects = Array.from(event.target.files);
       this.newFilesSelected = this.homework.selectedFileObjects.length > 0;
-      this.errorMessage = "";
+      this.errorMessage = ""; // Clear file-specific errors
       this.successMessage = "";
 
       const MAX_TOTAL_FILES = 5;
@@ -438,13 +468,20 @@ export default {
             event.target.value = null;
             this.newFilesSelected = false;
           }
-          return;
+          return; // Stop on first oversized file
         }
       }
     },
     validateClientSideForm() {
-      this.errorMessage = "";
+      // Clear only submission-related error message
+      if (
+        (this.errorMessage && this.errorMessage.startsWith("Lūdzu")) ||
+        this.errorMessage.startsWith("Saite")
+      ) {
+        this.errorMessage = "";
+      }
       this.successMessage = "";
+
       if (!this.homework.customGroupId) {
         this.errorMessage =
           "Lūdzu, izvēlieties grupu, kurai pievienot mājasdarbu.";
@@ -465,6 +502,7 @@ export default {
       if (this.homework.links.trim()) {
         const linksArray = this.homework.links
           .split("\n")
+          .map((link) => link.trim())
           .filter((link) => link.trim() !== "");
         for (const link of linksArray) {
           if (!link.startsWith("http://") && !link.startsWith("https://")) {
@@ -482,11 +520,20 @@ export default {
       if (!this.validateClientSideForm()) return;
 
       this.isLoading = true;
-      this.errorMessage = "";
+      // Clear only form-specific error messages before submission attempt
+      if (
+        this.errorMessage &&
+        (this.errorMessage.startsWith("Lūdzu") ||
+          this.errorMessage.startsWith("Saite") ||
+          this.errorMessage.startsWith("Jūs varat") ||
+          this.errorMessage.startsWith("Fails"))
+      ) {
+        this.errorMessage = "";
+      }
       this.successMessage = "";
 
       const formData = new FormData();
-      formData.append("customGroupId", this.homework.customGroupId); // New field
+      formData.append("customGroupId", this.homework.customGroupId);
       formData.append("subject", this.homework.subject);
       formData.append("description", this.homework.description);
       formData.append("dueDate", this.homework.dueDate);
@@ -522,13 +569,9 @@ export default {
             ? "Mājasdarbs veiksmīgi atjaunināts!"
             : "Mājasdarbs veiksmīgi pievienots!");
 
-        // Don't reset form if editing, only if adding new.
-        // For adding new, reset and potentially navigate or let user add another.
-        // For now, the emit takes care of navigation.
         if (!this.itemIdToEdit) {
           const previousCustomGroupId = this.homework.customGroupId;
           this.resetForm();
-          // Preserve custom group selection if user wants to add multiple to same group
           if (
             this.availableCustomGroups.some(
               (g) => g._id === previousCustomGroupId
@@ -538,7 +581,10 @@ export default {
           }
         }
 
-        this.$emit("itemActionSuccess", this.successMessage);
+        // Delay navigation to allow user to see success message
+        setTimeout(() => {
+          this.$emit("itemActionSuccess", this.successMessage);
+        }, 1500);
       } catch (error) {
         this.errorMessage =
           error.response?.data?.msg || "Darbības kļūda. Lūdzu, mēģiniet vēlāk.";
@@ -551,9 +597,6 @@ export default {
       }
     },
   },
-  // created() { // Replaced by watcher on currentUser
-  //   this.fetchRequiredDataForForm();
-  // }
 };
 </script>
 

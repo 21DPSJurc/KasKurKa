@@ -5,6 +5,7 @@ const { getDB } = require('../config/db');
 const { ObjectId } = require('mongodb'); // Added ObjectId
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
+const authMiddleware = require('../middleware/authMiddleware'); // For the new /me/refresh route
 
 const router = express.Router();
 
@@ -151,6 +152,57 @@ router.post('/login', async (req, res) => {
   } catch (err) {
     console.error('Login error:', err.message);
     res.status(500).send('Servera kļūda');
+  }
+});
+
+
+// @route   GET api/auth/me/refresh
+// @desc    Get current user's fresh data
+// @access  Private
+router.get('/me/refresh', authMiddleware, async (req, res) => {
+  try {
+    const db = getDB();
+    const usersCollection = db.collection('users');
+    const userId = new ObjectId(req.user.id);
+
+    const user = await usersCollection.findOne({ _id: userId });
+
+    if (!user) {
+      // This case should ideally be caught by authMiddleware if user doesn't exist
+      // But as a safeguard:
+      return res.status(404).json({ msg: 'Lietotājs nav atrasts.' });
+    }
+
+    // Prepare enrolledCustomGroupsDetails for the HTTP response
+    let enrolledCustomGroupsDetails = [];
+    if (user.enrolledCustomGroups && user.enrolledCustomGroups.length > 0) {
+      const groupObjectIds = user.enrolledCustomGroups.map(id => new ObjectId(id.toString())); // Ensure they are ObjectIds
+      enrolledCustomGroupsDetails = await db.collection('groups')
+        .find({ _id: { $in: groupObjectIds } })
+        .project({ name: 1, _id: 1 }) // Only need ID and name
+        .toArray();
+    }
+
+    // Construct the user object to be returned, similar to login
+    const refreshedUserObject = {
+      id: user._id.toString(),
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      studyStartYear: user.studyStartYear,
+      group: user.group, // Registration group
+      role: user.role,
+      createdAt: user.createdAt,
+      // Ensure enrolledCustomGroups are strings of IDs
+      enrolledCustomGroups: user.enrolledCustomGroups ? user.enrolledCustomGroups.map(id => id.toString()) : [],
+      enrolledCustomGroupsDetails: enrolledCustomGroupsDetails,
+    };
+
+    res.json(refreshedUserObject);
+
+  } catch (err) {
+    console.error('Error refreshing user data:', err);
+    res.status(500).send('Servera kļūda, mēģinot atjaunot lietotāja datus.');
   }
 });
 

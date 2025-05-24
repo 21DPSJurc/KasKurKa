@@ -7,10 +7,18 @@
       <h1>KasKurKa</h1>
       <div class="header-user-info">
         <router-link
+          v-if="currentUser && !isMyProfileView(currentView)"
+          to="#"
+          @click.prevent="navigateToMyProfile"
+          class="profile-link"
+          >Mans Profils</router-link
+        >
+        <router-link
           v-if="
             currentUser &&
             currentUser.role === 'admin' &&
-            !isAdminSpecificView(currentView)
+            !isAdminSpecificView(currentView) &&
+            !isMyProfileView(currentView)
           "
           to="#"
           @click.prevent="navigateToAdminDashboard"
@@ -18,8 +26,29 @@
           >Admin Panelis</router-link
         >
         <div v-if="currentUser" class="user-greeting">
-          Sveiki, {{ currentUser.firstName }}! ({{ currentUser.group }})
-          <!-- Display registration group -->
+          Sveiki, {{ currentUser.firstName }}!
+          <span
+            v-if="
+              currentUser.role === 'student' &&
+              currentUser.enrolledCustomGroupsDetails &&
+              currentUser.enrolledCustomGroupsDetails.length > 0
+            "
+          >
+            (Grupas:
+            {{
+              currentUser.enrolledCustomGroupsDetails
+                .map((g) => g.name)
+                .join(", ")
+            }})
+          </span>
+          <span v-else-if="currentUser.role === 'student'">
+            ({{ currentUser.group }})
+            <!-- Student, but no custom groups -->
+          </span>
+          <span v-else>
+            ({{ currentUser.group }})
+            <!-- Admin or other roles, display registration group -->
+          </span>
         </div>
       </div>
     </header>
@@ -30,10 +59,18 @@
       <h1>KasKurKa</h1>
       <div class="header-user-info">
         <router-link
+          v-if="currentUser && !isMyProfileView(currentView)"
+          to="#"
+          @click.prevent="navigateToMyProfile"
+          class="profile-link"
+          >Mans Profils</router-link
+        >
+        <router-link
           v-if="
             currentUser &&
             currentUser.role === 'admin' &&
-            !isAdminSpecificView(currentView)
+            !isAdminSpecificView(currentView) &&
+            !isMyProfileView(currentView)
           "
           to="#"
           @click.prevent="navigateToAdminDashboard"
@@ -41,8 +78,29 @@
           >Admin Panelis</router-link
         >
         <div v-if="currentUser" class="user-greeting">
-          Sveiki, {{ currentUser.firstName }}! ({{ currentUser.group }})
-          <!-- Display registration group -->
+          Sveiki, {{ currentUser.firstName }}!
+          <span
+            v-if="
+              currentUser.role === 'student' &&
+              currentUser.enrolledCustomGroupsDetails &&
+              currentUser.enrolledCustomGroupsDetails.length > 0
+            "
+          >
+            (Grupas:
+            {{
+              currentUser.enrolledCustomGroupsDetails
+                .map((g) => g.name)
+                .join(", ")
+            }})
+          </span>
+          <span v-else-if="currentUser.role === 'student'">
+            ({{ currentUser.group }})
+            <!-- Student, but no custom groups -->
+          </span>
+          <span v-else>
+            ({{ currentUser.group }})
+            <!-- Admin or other roles, display registration group -->
+          </span>
         </div>
       </div>
     </header>
@@ -79,6 +137,11 @@
         @navigateHome="showHome"
         @navigateToRegister="navigateToRegister"
         @loginSuccess="handleLoginSuccess"
+      />
+      <MyProfileView
+        v-else-if="currentView === 'myProfile' && currentUser"
+        :current-user="currentUser"
+        @navigateToUserSpecificDashboard="navigateToUserSpecificDashboard"
       />
 
       <!-- Student Views -->
@@ -224,6 +287,7 @@ import ManageGroupsView from "./views/ManageGroupsView.vue";
 import EditGroupView from "./views/EditGroupView.vue";
 import ManageUsersView from "./views/ManageUsersView.vue";
 import EditUserView from "./views/EditUserView.vue";
+import MyProfileView from "./views/MyProfileView.vue";
 import axios from "axios";
 
 export default {
@@ -243,10 +307,11 @@ export default {
     EditGroupView,
     ManageUsersView,
     EditUserView,
+    MyProfileView,
   },
   data() {
     return {
-      currentView: "home", // Default to home if no auto-login
+      currentView: "home",
       currentUser: null,
       isLoadingAuth: true,
       dashboardRelatedViews: [
@@ -262,6 +327,7 @@ export default {
         "editGroup",
         "manageUsers",
         "editUser",
+        "myProfile",
       ],
       adminSpecificViews: [
         "adminDashboard",
@@ -278,17 +344,53 @@ export default {
       editingUserId: null,
     };
   },
+  provide() {
+    return {
+      refreshUser: this.refreshCurrentUserState,
+    };
+  },
   created() {
     this.tryAutoLogin();
   },
   methods: {
+    async refreshCurrentUserState() {
+      console.log("[App.vue] Attempting to refresh current user state...");
+      if (!this.currentUser || !localStorage.getItem("token")) {
+        console.log("[App.vue] No current user or token, skipping refresh.");
+        return; // Return a resolved promise or nothing if not async explicitly
+      }
+      try {
+        const response = await axios.get("/api/auth/me/refresh");
+        const refreshedUser = response.data; // This is the user object
+
+        // Update currentUser state. This will reactively update child components.
+        this.currentUser = refreshedUser;
+        localStorage.setItem("user", JSON.stringify(this.currentUser));
+        console.log("[App.vue] User state refreshed:", this.currentUser);
+      } catch (error) {
+        console.error("[App.vue] Error refreshing user state:", error);
+        if (
+          error.response &&
+          (error.response.status === 401 || error.response.status === 403)
+        ) {
+          // Token might be invalid or expired, log out user
+          this.handleLogout();
+          // Optionally throw error so awaiters in child components can catch it
+          throw new Error("User refresh failed, logged out.");
+        }
+        // Re-throw for the caller to handle if needed
+        throw error;
+      }
+    },
     isDashboardRelatedView(viewName) {
       return this.dashboardRelatedViews.includes(viewName);
     },
     isAdminSpecificView(viewName) {
       return this.adminSpecificViews.includes(viewName);
     },
-
+    isMyProfileView(viewName) {
+      return viewName === "myProfile";
+    },
     tryAutoLogin() {
       this.isLoadingAuth = true;
       const token = localStorage.getItem("token");
@@ -297,50 +399,34 @@ export default {
       if (token && userString) {
         try {
           const user = JSON.parse(userString);
-          this.currentUser = user; // Includes enrolledCustomGroupsDetails
+          this.currentUser = user;
           axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-          // Initial view logic based on role if logged in
-          if (this.currentUser.role === "admin") {
-            // If currentView is not an admin view or student dash/list, go to admin dash
-            if (
-              !this.adminSpecificViews.includes(this.currentView) &&
-              ![
-                "dashboard",
-                "homeworkList",
-                "addHomework",
-                "addTest",
-                "groupList",
-              ].includes(this.currentView)
-            ) {
+
+          if (
+            this.currentView === "home" ||
+            this.currentView === "login" ||
+            this.currentView === "register"
+          ) {
+            if (this.currentUser.role === "admin") {
               this.currentView = "adminDashboard";
-            }
-          } else {
-            // student
-            // If currentView is an admin view, or not a known dashboard view, go to student dash
-            if (
-              this.adminSpecificViews.includes(this.currentView) ||
-              !this.dashboardRelatedViews.includes(this.currentView) ||
-              this.currentView === "home" // If was home, but now logged in
-            ) {
+            } else {
               this.currentView = "dashboard";
             }
           }
         } catch (e) {
           console.error("Auto-login error, clearing stored data:", e);
-          this.handleLogout(); // Clears local storage and redirects to home
+          this.handleLogout(); // Clears stale data
         }
       } else {
-        // Not logged in, ensure view is public
         if (
           this.dashboardRelatedViews.includes(this.currentView) ||
-          this.adminSpecificViews.includes(this.currentView)
+          this.adminSpecificViews.includes(this.currentView) ||
+          this.currentView === "myProfile"
         ) {
           this.currentView = "home";
         } else if (!this.currentView) {
-          // handles case if currentView was somehow null/undefined
           this.currentView = "home";
         }
-        // If currentView is already 'home', 'login', or 'register', it's fine.
       }
       this.isLoadingAuth = false;
     },
@@ -356,7 +442,14 @@ export default {
       this.currentView = "home";
       this.clearAllEditStates();
     },
-
+    navigateToMyProfile() {
+      if (this.currentUser) {
+        this.currentView = "myProfile";
+      } else {
+        this.navigateToLogin();
+      }
+      this.clearAllEditStates();
+    },
     navigateToUserSpecificDashboard() {
       if (this.currentUser) {
         this.currentView =
@@ -366,32 +459,27 @@ export default {
       }
       this.clearAllEditStates();
     },
-    // navigateToDashboard remains as is (directs to appropriate dashboard)
-
     navigateToStudentDashboard() {
-      // Explicitly go to student dashboard (e.g., for admin viewing as student)
       if (this.currentUser) {
-        this.currentView = "dashboard"; // Student dashboard view name
+        this.currentView = "dashboard";
       } else {
         this.navigateToLogin();
       }
       this.clearAllEditStates();
     },
-
     handleRegistrationSuccess() {
       this.currentView = "login";
       alert("Reģistrācija veiksmīga! Lūdzu, pieslēdzieties.");
       this.clearAllEditStates();
     },
     handleLoginSuccess(authData) {
-      this.currentUser = authData.user; // authData.user now has enrolledCustomGroupsDetails
+      this.currentUser = authData.user;
       localStorage.setItem("token", authData.token);
       localStorage.setItem("user", JSON.stringify(authData.user));
       axios.defaults.headers.common[
         "Authorization"
       ] = `Bearer ${authData.token}`;
-
-      this.navigateToUserSpecificDashboard(); // This will set the correct dashboard view
+      this.navigateToUserSpecificDashboard();
     },
     handleLogout() {
       this.currentUser = null;
@@ -402,7 +490,6 @@ export default {
       alert("Jūs esat veiksmīgi izgājis no sistēmas.");
       this.clearAllEditStates();
     },
-
     navigateToAddHomework() {
       if (this.currentUser) {
         this.clearAllEditStates();
@@ -426,9 +513,8 @@ export default {
       }
     },
     cancelEditItem() {
-      // Called from AddHomeworkView/AddTestView when editing is cancelled
       this.clearAllEditStates();
-      this.navigateToHomeworkList(); // Go back to the list view
+      this.navigateToHomeworkList();
     },
     handleItemActionSuccess(message) {
       alert(message || "Darbība veiksmīga!");
@@ -445,9 +531,7 @@ export default {
     },
     handleItemDeletedInList(message) {
       alert(message || "Ieraksts dzēsts.");
-      // The list view should refresh itself after deletion.
     },
-
     navigateToGroupList() {
       if (this.currentUser) {
         this.currentView = "groupList";
@@ -456,13 +540,11 @@ export default {
         this.navigateToLogin();
       }
     },
-
-    // Admin specific navigation
     navigateToAdminDashboard() {
       if (this.currentUser && this.currentUser.role === "admin") {
         this.currentView = "adminDashboard";
       } else {
-        this.showHome(); // Or navigateToLogin if preferred for non-admins trying to access
+        this.showHome();
       }
       this.clearAllEditStates();
     },
@@ -505,7 +587,7 @@ export default {
     },
     handleGroupUpdateSuccess(message) {
       alert(message || "Grupa veiksmīgi atjaunināta!");
-      this.navigateToManageGroups(); // Go back to manage groups list
+      this.navigateToManageGroups();
     },
     navigateToManageUsers() {
       if (this.currentUser && this.currentUser.role === "admin") {
@@ -526,9 +608,8 @@ export default {
     },
     handleUserUpdateSuccess(message) {
       alert(message || "Lietotāja dati veiksmīgi atjaunināti!");
-      this.navigateToManageUsers(); // Go back to manage users list
+      this.navigateToManageUsers();
     },
-
     clearAllEditStates() {
       this.editingItemId = null;
       this.editingItemType = null;
@@ -562,31 +643,36 @@ body {
   padding: 20px 0;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   display: flex;
-  justify-content: space-around;
+  justify-content: space-around; /* Changed to space-around for better link spacing */
   align-items: center;
+  flex-wrap: wrap; /* Allow wrapping for smaller screens */
 }
 .app-header h1 {
   margin: 0;
   font-size: 2.5em;
   text-align: center;
-  flex-grow: 1;
+  /* flex-grow: 1; Removed to allow natural sizing with more links */
 }
 .header-user-info {
   display: flex;
   align-items: center;
-  margin-right: 20px;
+  gap: 15px; /* Add gap between items */
+  margin-right: 20px; /* Keep margin for overall spacing */
 }
 .user-greeting {
   font-size: 1em;
-  margin-left: 15px;
+  /* margin-left: 15px; Removed, using gap now */
 }
-.admin-panel-link {
+.admin-panel-link,
+.profile-link {
+  /* Added profile-link */
   color: #f1c40f;
   text-decoration: none;
   font-weight: bold;
-  margin-left: 15px;
+  /* margin-left: 15px; Removed, using gap now */
 }
-.admin-panel-link:hover {
+.admin-panel-link:hover,
+.profile-link:hover {
   text-decoration: underline;
 }
 .app-main {
@@ -753,22 +839,22 @@ body {
 @media (max-width: 768px) {
   .app-header {
     flex-direction: column;
+    gap: 10px; /* Spacing for wrapped items */
   }
   .app-header h1 {
-    margin-bottom: 10px;
-  }
-  .user-greeting {
-    margin-right: 0;
-    margin-bottom: 10px;
-  }
-  .admin-panel-link {
-    margin-right: 0;
     margin-bottom: 10px;
   }
   .header-user-info {
     flex-direction: column;
     align-items: center;
     margin-right: 0;
+    gap: 10px;
+  }
+  .user-greeting,
+  .admin-panel-link,
+  .profile-link {
+    /* Ensure these stack nicely */
+    margin: 0; /* Reset individual margins */
   }
   .form-view {
     margin: 20px 10px;

@@ -18,14 +18,14 @@
     <div v-if="isLoadingInitialData" class="loading-message">
       Notiek datu ielāde...
     </div>
-    <div v-else-if="!canAddOrEdit" class="error-message">
+    <div v-else-if="!canAddOrEditLogic" class="error-message">
       {{ addEditNotAllowedMessage }}
     </div>
 
     <form
       @submit.prevent="submitTest"
       class="test-form"
-      v-if="canAddOrEdit && !isLoadingInitialData"
+      v-if="canAddOrEditLogic && !isLoadingInitialData"
     >
       <div class="form-group">
         <label for="customGroupIdTest"
@@ -54,7 +54,8 @@
             availableCustomGroups.length === 0
           "
           >Jums jābūt vismaz vienas grupas dalībniekam, lai pievienotu pārbaudes
-          darbu.</small
+          darbu. Mēģiniet vēlreiz ielādēt lapu vai sazinieties ar
+          administratoru, ja nesen tikāt pievienots jaunai grupai.</small
         >
         <small
           v-if="
@@ -153,9 +154,7 @@
         <button
           type="submit"
           class="action-button"
-          :disabled="
-            isLoading || (availableCustomGroups.length === 0 && !itemIdToEdit)
-          "
+          :disabled="isLoading || !canAddOrEditLogic"
         >
           {{
             isLoading
@@ -187,6 +186,7 @@ export default {
       required: true,
     },
   },
+  inject: ["refreshUser"], // Inject the refresh method from App.vue
   data() {
     const now = new Date();
     const year = now.getFullYear();
@@ -201,7 +201,7 @@ export default {
         topics: "",
         format: "",
         additionalInfo: "",
-        customGroupId: "", // ID of the custom group
+        customGroupId: "",
       },
       today: `${year}-${month}-${day}`,
       errorMessage: "",
@@ -219,7 +219,8 @@ export default {
       }
       return this.currentUser.enrolledCustomGroupsDetails || [];
     },
-    canAddOrEdit() {
+    canAddOrEditLogic() {
+      // Renamed from canAddOrEdit
       if (!this.currentUser) return false;
       if (this.itemIdToEdit) return true;
 
@@ -239,7 +240,8 @@ export default {
       if (
         this.currentUser &&
         this.currentUser.role === "admin" &&
-        this.allSystemGroups.length === 0
+        this.allSystemGroups.length === 0 &&
+        !this.isLoadingInitialData
       ) {
         return "Lai pievienotu pārbaudes darbu, vispirms sistēmā ir jāizveido vismaz viena grupa.";
       }
@@ -247,43 +249,64 @@ export default {
         this.currentUser &&
         this.currentUser.role === "student" &&
         (!this.currentUser.enrolledCustomGroupsDetails ||
-          this.currentUser.enrolledCustomGroupsDetails.length === 0)
+          this.currentUser.enrolledCustomGroupsDetails.length === 0) &&
+        !this.isLoadingInitialData
       ) {
-        return "Lai pievienotu pārbaudes darbu, Jums ir jābūt dalībniekam vismaz vienā grupā.";
+        return "Lai pievienotu pārbaudes darbu, Jums ir jābūt dalībniekam vismaz vienā grupā. Ja nesen tikāt pievienots, mēģiniet pārlādēt lapu vai doties atpakaļ uz paneli un atgriezties šeit.";
       }
-      return "Jums nav tiesību pievienot jaunus pārbaudes darbus.";
+      if (!this.isLoadingInitialData)
+        return "Jums nav tiesību pievienot jaunus pārbaudes darbus.";
+      return "Notiek datu ielāde...";
     },
   },
   watch: {
-    itemIdToEdit: {
-      immediate: true,
-      async handler(newVal) {
-        this.isLoadingInitialData = true;
-        await this.fetchRequiredDataForForm();
-        if (newVal) {
-          await this.loadTestForEditing(newVal);
-        } else {
-          this.resetForm();
-        }
-        this.isLoadingInitialData = false;
-      },
+    itemIdToEdit(newVal, oldVal) {
+      if (newVal !== oldVal && !this.isLoadingInitialData) {
+        this.handleIdOrUserChange();
+      }
     },
-    currentUser: {
-      immediate: true,
-      async handler() {
-        this.isLoadingInitialData = true;
-        await this.fetchRequiredDataForForm();
-        this.isLoadingInitialData = false;
-      },
-    },
+    // currentUser(newVal, oldVal) {
+    //    if (newVal && newVal.id !== oldVal?.id && !this.isLoadingInitialData) {
+    //     this.handleIdOrUserChange();
+    //   }
+    // }
+  },
+  async mounted() {
+    await this.performInitialSetup();
   },
   methods: {
-    async fetchRequiredDataForForm() {
-      if (
-        this.currentUser &&
-        this.currentUser.role === "admin" &&
-        this.allSystemGroups.length === 0
-      ) {
+    async performInitialSetup() {
+      this.isLoadingInitialData = true;
+      this.errorMessage = "";
+      try {
+        if (this.refreshUser) {
+          await this.refreshUser();
+        }
+        await this.handleIdOrUserChange();
+      } catch (error) {
+        console.error("Error during initial setup of AddTestView:", error);
+        this.errorMessage =
+          "Kļūda ielādējot nepieciešamos datus. " + (error.message || "");
+      } finally {
+        this.isLoadingInitialData = false;
+      }
+    },
+    async handleIdOrUserChange() {
+      if (this.currentUser && this.currentUser.role === "admin") {
+        await this.fetchAllSystemGroups();
+      }
+
+      if (this.itemIdToEdit) {
+        await this.loadTestForEditing(this.itemIdToEdit);
+      } else {
+        this.resetForm();
+      }
+    },
+    async fetchAllSystemGroups() {
+      if (this.currentUser && this.currentUser.role === "admin") {
+        if (this.allSystemGroups.length > 0 && !this.itemIdToEdit) {
+          /* simple cache */
+        }
         try {
           const response = await axios.get("/api/groups");
           this.allSystemGroups = response.data;
@@ -310,12 +333,12 @@ export default {
             ? this.availableCustomGroups[0]._id
             : "",
       };
-      this.errorMessage = "";
+      // this.errorMessage = "";
       this.successMessage = "";
     },
     async loadTestForEditing(itemId) {
       this.isLoading = true;
-      this.errorMessage = "";
+      // this.errorMessage = "";
       this.successMessage = "";
       try {
         const response = await axios.get(`/api/tests/${itemId}`);
@@ -335,7 +358,8 @@ export default {
         console.error("Error loading test for editing:", error);
         this.errorMessage =
           error.response?.data?.msg ||
-          "Kļūda ielādējot pārbaudes darba datus rediģēšanai.";
+          "Kļūda ielādējot pārbaudes darba datus rediģēšanai. " +
+            (this.errorMessage || "");
         if (error.response?.status === 403 || error.response?.status === 404) {
           setTimeout(() => this.$emit("navigateToDashboard"), 2000);
         }
@@ -354,8 +378,14 @@ export default {
       this.$emit("cancelEdit");
     },
     validateClientSideForm() {
-      this.errorMessage = "";
+      if (
+        (this.errorMessage && this.errorMessage.startsWith("Lūdzu")) ||
+        this.errorMessage.startsWith("Norādītais laiks")
+      ) {
+        this.errorMessage = "";
+      }
       this.successMessage = "";
+
       if (!this.test.customGroupId) {
         this.errorMessage =
           "Lūdzu, izvēlieties grupu, kurai pievienot pārbaudes darbu.";
@@ -384,10 +414,16 @@ export default {
       if (!this.validateClientSideForm()) return;
 
       this.isLoading = true;
-      this.errorMessage = "";
+      if (
+        this.errorMessage &&
+        (this.errorMessage.startsWith("Lūdzu") ||
+          this.errorMessage.startsWith("Norādītais laiks"))
+      ) {
+        this.errorMessage = "";
+      }
       this.successMessage = "";
 
-      const testData = { ...this.test }; // Send all fields from this.test
+      const testData = { ...this.test };
 
       try {
         let response;
@@ -417,7 +453,9 @@ export default {
           }
         }
 
-        this.$emit("itemActionSuccess", this.successMessage);
+        setTimeout(() => {
+          this.$emit("itemActionSuccess", this.successMessage);
+        }, 1500);
       } catch (error) {
         this.errorMessage =
           error.response?.data?.msg || "Darbības kļūda. Lūdzu, mēģiniet vēlāk.";
@@ -430,9 +468,6 @@ export default {
       }
     },
   },
-  // created() {
-  //   this.fetchRequiredDataForForm();
-  // }
 };
 </script>
 

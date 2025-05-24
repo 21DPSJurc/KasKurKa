@@ -39,7 +39,7 @@ router.post('/', [authMiddleware, adminMiddleware], async (req, res) => {
             adminCreatorId: new ObjectId(req.user.id),
             createdAt: new Date(),
             updatedAt: new Date(),
-            members: [],
+            members: [], // Initialize as empty array of user ObjectIds
         };
 
         const result = await groupsCollection.insertOne(newGroup);
@@ -118,13 +118,11 @@ router.put('/:groupId', [authMiddleware, adminMiddleware], async (req, res) => {
         const groupsCollection = db.collection('groups');
         const groupObjectId = new ObjectId(groupId);
 
-        // Check if group exists
         const existingGroup = await groupsCollection.findOne({ _id: groupObjectId });
         if (!existingGroup) {
             return res.status(404).json({ msg: 'Grupa nav atrasta.' });
         }
 
-        // Check if new name conflicts with another existing group (excluding itself)
         const conflictingGroup = await groupsCollection.findOne({
             name: { $regex: `^${name.trim()}$`, $options: 'i' },
             _id: { $ne: groupObjectId }
@@ -135,8 +133,8 @@ router.put('/:groupId', [authMiddleware, adminMiddleware], async (req, res) => {
 
         const updateFields = {
             name: name.trim(),
-            description: description ? description.trim() : existingGroup.description, // Keep old if not provided
-            studyYear: studyYear ? studyYear.trim() : existingGroup.studyYear, // Keep old if not provided
+            description: description ? description.trim() : existingGroup.description,
+            studyYear: studyYear ? studyYear.trim() : existingGroup.studyYear,
             updatedAt: new Date(),
         };
 
@@ -145,7 +143,7 @@ router.put('/:groupId', [authMiddleware, adminMiddleware], async (req, res) => {
             { $set: updateFields }
         );
 
-        if (result.matchedCount === 0) { // Should not happen if previous check passed
+        if (result.matchedCount === 0) {
             return res.status(404).json({ msg: 'Grupa netika atrasta atjaunināšanai.' });
         }
 
@@ -180,17 +178,8 @@ router.delete('/:groupId', [authMiddleware, adminMiddleware], async (req, res) =
             return res.status(404).json({ msg: 'Grupa nav atrasta.' });
         }
 
-        // 1. Delete the group itself
-        const deleteResult = await groupsCollection.deleteOne({ _id: groupObjectId });
-        if (deleteResult.deletedCount === 0) {
-            // Should not happen if groupToDelete was found
-            return res.status(404).json({ msg: 'Grupu neizdevās dzēst vai tā jau ir dzēsta.' });
-        }
-
-        // 2. Delete associated group applications
+        await groupsCollection.deleteOne({ _id: groupObjectId });
         await groupApplicationsCollection.deleteMany({ groupId: groupObjectId });
-
-        // 3. Remove the group from users' enrolledCustomGroups arrays
         await usersCollection.updateMany(
             { enrolledCustomGroups: groupObjectId },
             { $pull: { enrolledCustomGroups: groupObjectId } }
@@ -211,15 +200,14 @@ router.delete('/:groupId', [authMiddleware, adminMiddleware], async (req, res) =
 router.post('/:groupId/apply', authMiddleware, async (req, res) => {
     const groupId = req.params.groupId;
     const userId = new ObjectId(req.user.id);
-    const userFirstName = req.user.firstName; // From JWT
-    const userEmail = req.user.email;       // From JWT
-    const { message } = req.body; // New: Get message from request body
+    const userFirstName = req.user.firstName;
+    const userEmail = req.user.email;
+    const { message } = req.body;
 
     if (!ObjectId.isValid(groupId)) {
         return res.status(400).json({ msg: 'Nederīgs grupas ID.' });
     }
-
-    if (message && message.length > 500) { // Optional: Validate message length
+    if (message && message.length > 500) {
         return res.status(400).json({ msg: 'Pieteikuma ziņa nedrīkst pārsniegt 500 rakstzīmes.' });
     }
 
@@ -228,7 +216,6 @@ router.post('/:groupId/apply', authMiddleware, async (req, res) => {
         const groupsCollection = db.collection('groups');
         const groupApplicationsCollection = db.collection('groupApplications');
         const usersCollection = db.collection('users');
-
         const groupObjectId = new ObjectId(groupId);
 
         const group = await groupsCollection.findOne({ _id: groupObjectId });
@@ -244,6 +231,7 @@ router.post('/:groupId/apply', authMiddleware, async (req, res) => {
             return res.status(400).json({ msg: 'Jūs jau esat šīs grupas dalībnieks (pārbaudīts grupas sarakstā).' });
         }
 
+
         const existingApplication = await groupApplicationsCollection.findOne({
             groupId: groupObjectId,
             userId: userId,
@@ -254,8 +242,6 @@ router.post('/:groupId/apply', authMiddleware, async (req, res) => {
             if (existingApplication.status === 'pending') {
                 return res.status(400).json({ msg: 'Jūsu pieteikums šai grupai jau ir reģistrēts un gaida apstiprinājumu.' });
             } else if (existingApplication.status === 'approved') {
-                // This scenario should ideally be caught by the enrolledCustomGroups check earlier
-                // or group.members check.
                 return res.status(400).json({ msg: 'Jūs jau esat apstiprināts šai grupai.' });
             }
         }
@@ -265,16 +251,13 @@ router.post('/:groupId/apply', authMiddleware, async (req, res) => {
             userId: userId,
             userFirstName: userFirstName,
             userEmail: userEmail,
-            message: message ? message.trim() : '', // New: Store the message
+            message: message ? message.trim() : '',
             status: 'pending',
             appliedAt: new Date(),
-            groupName: group.name // Storing groupName for easier display in application lists
+            groupName: group.name
         };
-
         await groupApplicationsCollection.insertOne(newApplication);
-
         res.status(201).json({ msg: 'Pieteikums grupai veiksmīgi nosūtīts!' });
-
     } catch (err) {
         console.error('Error applying to group:', err);
         res.status(500).json({ msg: 'Servera kļūda, piesakoties grupai.' });
@@ -302,19 +285,12 @@ router.get('/applications/my', authMiddleware, async (req, res) => {
             { $unwind: { path: "$groupInfo", preserveNullAndEmptyArrays: true } },
             {
                 $project: {
-                    _id: 1,
-                    groupId: 1,
-                    groupName: '$groupInfo.name', // Keep groupName from application doc or fallback
-                    status: 1,
-                    appliedAt: 1,
-                    message: 1, // New: Include the message
-                    userFirstName: 1,
-                    userEmail: 1
+                    _id: 1, groupId: 1, groupName: '$groupInfo.name', status: 1,
+                    appliedAt: 1, message: 1, userFirstName: 1, userEmail: 1
                 }
             },
             { $sort: { appliedAt: -1 } }
         ]).toArray();
-
         res.json(applications);
     } catch (err) {
         console.error('Error fetching user applications:', err);
@@ -330,7 +306,6 @@ router.get('/applications', [authMiddleware, adminMiddleware], async (req, res) 
     try {
         const db = getDB();
         const groupApplicationsCollection = db.collection('groupApplications');
-
         const query = {};
         if (status) query.status = status;
         if (groupId && ObjectId.isValid(groupId)) query.groupId = new ObjectId(groupId);
@@ -339,63 +314,43 @@ router.get('/applications', [authMiddleware, adminMiddleware], async (req, res) 
             { $match: query },
             {
                 $lookup: {
-                    from: 'groups',
-                    localField: 'groupId',
-                    foreignField: '_id',
-                    as: 'groupDetails'
+                    from: 'groups', localField: 'groupId', foreignField: '_id', as: 'groupDetails'
                 }
             },
-            {
-                $unwind: {
-                    path: "$groupDetails",
-                    preserveNullAndEmptyArrays: true // Keep applications even if group is deleted
-                }
-            },
+            { $unwind: { path: "$groupDetails", preserveNullAndEmptyArrays: true } },
             {
                 $project: {
-                    _id: 1,
-                    groupId: 1,
-                    groupName: { $ifNull: ['$groupDetails.name', '$groupName'] }, // Use name from groupDetails if available, else from application
-                    userId: 1,
-                    userFirstName: 1,
-                    userEmail: 1,
-                    message: 1, // New: Include the message
-                    status: 1,
-                    appliedAt: 1
+                    _id: 1, groupId: 1,
+                    groupName: { $ifNull: ['$groupDetails.name', '$groupName'] },
+                    userId: 1, userFirstName: 1, userEmail: 1, message: 1,
+                    status: 1, appliedAt: 1
                 }
             },
             { $sort: { appliedAt: -1 } }
         ]).toArray();
-
         res.json(applications);
-
     } catch (err) {
         console.error('Error fetching group applications for admin:', err);
         res.status(500).json({ msg: 'Servera kļūda, ielādējot grupu pieteikumus.' });
     }
 });
 
-
 // @route   PUT api/groups/applications/:applicationId/approve
 // @desc    Approve a group application (Admin only)
 // @access  Private (Admin)
 router.put('/applications/:applicationId/approve', [authMiddleware, adminMiddleware], async (req, res) => {
     const applicationId = req.params.applicationId;
-
     if (!ObjectId.isValid(applicationId)) {
         return res.status(400).json({ msg: 'Nederīgs pieteikuma ID.' });
     }
-
     try {
         const db = getDB();
         const groupApplicationsCollection = db.collection('groupApplications');
         const groupsCollection = db.collection('groups');
         const usersCollection = db.collection('users');
-
         const appObjectId = new ObjectId(applicationId);
 
         const application = await groupApplicationsCollection.findOne({ _id: appObjectId });
-
         if (!application) {
             return res.status(404).json({ msg: 'Pieteikums nav atrasts.' });
         }
@@ -403,10 +358,8 @@ router.put('/applications/:applicationId/approve', [authMiddleware, adminMiddlew
             return res.status(400).json({ msg: `Pieteikums jau ir ticis '${application.status}'.` });
         }
 
-        // Check if group still exists before adding member
         const groupExists = await groupsCollection.findOne({ _id: application.groupId });
         if (!groupExists) {
-            // If group doesn't exist, maybe reject application automatically or inform admin
             await groupApplicationsCollection.updateOne(
                 { _id: appObjectId },
                 { $set: { status: 'rejected', processedAt: new Date(), processedBy: new ObjectId(req.user.id), reason: 'Grupa vairs neeksistē' } }
@@ -414,29 +367,19 @@ router.put('/applications/:applicationId/approve', [authMiddleware, adminMiddlew
             return res.status(404).json({ msg: 'Nevar apstiprināt pieteikumu: Grupa vairs neeksistē. Pieteikums automātiski noraidīts.' });
         }
 
-
-        const updateAppStatus = await groupApplicationsCollection.updateOne(
+        await groupApplicationsCollection.updateOne(
             { _id: appObjectId },
             { $set: { status: 'approved', processedAt: new Date(), processedBy: new ObjectId(req.user.id) } }
         );
-        if (updateAppStatus.modifiedCount === 0) {
-            return res.status(500).json({ msg: 'Neizdevās atjaunināt pieteikuma statusu.' });
-        }
-
-        // Add user to group's members list
         await groupsCollection.updateOne(
             { _id: application.groupId },
-            { $addToSet: { members: application.userId } } // Use $addToSet to avoid duplicates
+            { $addToSet: { members: application.userId } }
         );
-
-        // Add group to user's enrolledCustomGroups list
         await usersCollection.updateOne(
             { _id: application.userId },
-            { $addToSet: { enrolledCustomGroups: application.groupId } } // Use $addToSet
+            { $addToSet: { enrolledCustomGroups: application.groupId } }
         );
-
         res.json({ msg: 'Pieteikums veiksmīgi apstiprināts. Lietotājs pievienots grupai.' });
-
     } catch (err) {
         console.error('Error approving group application:', err);
         res.status(500).json({ msg: 'Servera kļūda, apstiprinot pieteikumu.' });
@@ -448,39 +391,149 @@ router.put('/applications/:applicationId/approve', [authMiddleware, adminMiddlew
 // @access  Private (Admin)
 router.put('/applications/:applicationId/reject', [authMiddleware, adminMiddleware], async (req, res) => {
     const applicationId = req.params.applicationId;
-
     if (!ObjectId.isValid(applicationId)) {
         return res.status(400).json({ msg: 'Nederīgs pieteikuma ID.' });
     }
-
     try {
         const db = getDB();
         const groupApplicationsCollection = db.collection('groupApplications');
         const appObjectId = new ObjectId(applicationId);
 
         const application = await groupApplicationsCollection.findOne({ _id: appObjectId });
-
         if (!application) {
             return res.status(404).json({ msg: 'Pieteikums nav atrasts.' });
         }
         if (application.status !== 'pending') {
             return res.status(400).json({ msg: `Pieteikums jau ir ticis '${application.status}'.` });
         }
-
-        const updateResult = await groupApplicationsCollection.updateOne(
+        await groupApplicationsCollection.updateOne(
             { _id: appObjectId },
             { $set: { status: 'rejected', processedAt: new Date(), processedBy: new ObjectId(req.user.id) } }
         );
-
-        if (updateResult.modifiedCount === 0) {
-            return res.status(500).json({ msg: 'Neizdevās atjaunināt pieteikuma statusu uz noraidītu.' });
-        }
-
         res.json({ msg: 'Pieteikums veiksmīgi noraidīts.' });
-
     } catch (err) {
         console.error('Error rejecting group application:', err);
         res.status(500).json({ msg: 'Servera kļūda, noraidot pieteikumu.' });
+    }
+});
+
+// ==== NEW ROUTES FOR DIRECT MEMBER MANAGEMENT ====
+
+// @route   POST api/groups/:groupId/members
+// @desc    Admin directly adds a user to a group
+// @access  Private (Admin)
+router.post('/:groupId/members', [authMiddleware, adminMiddleware], async (req, res) => {
+    const { groupId } = req.params;
+    const { userId } = req.body; // User ID to add
+
+    if (!ObjectId.isValid(groupId) || !ObjectId.isValid(userId)) {
+        return res.status(400).json({ msg: 'Nederīgs grupas vai lietotāja ID.' });
+    }
+
+    const groupObjectId = new ObjectId(groupId);
+    const userObjectId = new ObjectId(userId);
+
+    try {
+        const db = getDB();
+        const groupsCollection = db.collection('groups');
+        const usersCollection = db.collection('users');
+
+        const group = await groupsCollection.findOne({ _id: groupObjectId });
+        if (!group) {
+            return res.status(404).json({ msg: 'Grupa nav atrasta.' });
+        }
+
+        const user = await usersCollection.findOne({ _id: userObjectId });
+        if (!user) {
+            return res.status(404).json({ msg: 'Lietotājs nav atrasts.' });
+        }
+        // Optional: Check if user is already a member (though $addToSet handles duplicates)
+        // if (group.members && group.members.some(memberId => memberId.equals(userObjectId))) {
+        //     return res.status(400).json({ msg: 'Lietotājs jau ir šīs grupas dalībnieks.' });
+        // }
+
+        // Add user to group's members list
+        const groupUpdateResult = await groupsCollection.updateOne(
+            { _id: groupObjectId },
+            { $addToSet: { members: userObjectId } }
+        );
+
+        // Add group to user's enrolledCustomGroups list
+        const userUpdateResult = await usersCollection.updateOne(
+            { _id: userObjectId },
+            { $addToSet: { enrolledCustomGroups: groupObjectId } }
+        );
+
+        if (groupUpdateResult.modifiedCount > 0 || userUpdateResult.modifiedCount > 0) {
+            // Also mark any 'pending' application for this user to this group as 'approved'
+            await db.collection('groupApplications').updateOne(
+                { userId: userObjectId, groupId: groupObjectId, status: 'pending' },
+                { $set: { status: 'approved', processedAt: new Date(), processedBy: new ObjectId(req.user.id), reason: 'Manuāli pievienots administrators' } }
+            );
+            res.json({ msg: `Lietotājs ${user.firstName} ${user.lastName} veiksmīgi pievienots grupai '${group.name}'.` });
+        } else {
+            res.json({ msg: `Lietotājs ${user.firstName} ${user.lastName} jau bija grupā '${group.name}' vai izmaiņas netika veiktas.` });
+        }
+
+    } catch (error) {
+        console.error('Error adding member to group:', error);
+        res.status(500).json({ msg: 'Servera kļūda, pievienojot dalībnieku grupai.' });
+    }
+});
+
+// @route   DELETE api/groups/:groupId/members/:userId
+// @desc    Admin directly removes a user from a group
+// @access  Private (Admin)
+router.delete('/:groupId/members/:userId', [authMiddleware, adminMiddleware], async (req, res) => {
+    const { groupId, userId } = req.params;
+
+    if (!ObjectId.isValid(groupId) || !ObjectId.isValid(userId)) {
+        return res.status(400).json({ msg: 'Nederīgs grupas vai lietotāja ID.' });
+    }
+
+    const groupObjectId = new ObjectId(groupId);
+    const userObjectId = new ObjectId(userId);
+
+    try {
+        const db = getDB();
+        const groupsCollection = db.collection('groups');
+        const usersCollection = db.collection('users');
+
+        const group = await groupsCollection.findOne({ _id: groupObjectId });
+        if (!group) {
+            return res.status(404).json({ msg: 'Grupa nav atrasta.' });
+        }
+        const user = await usersCollection.findOne({ _id: userObjectId });
+        if (!user) {
+            return res.status(404).json({ msg: 'Lietotājs nav atrasts.' });
+        }
+
+        // Remove user from group's members list
+        const groupUpdateResult = await groupsCollection.updateOne(
+            { _id: groupObjectId },
+            { $pull: { members: userObjectId } }
+        );
+
+        // Remove group from user's enrolledCustomGroups list
+        const userUpdateResult = await usersCollection.updateOne(
+            { _id: userObjectId },
+            { $pull: { enrolledCustomGroups: groupObjectId } }
+        );
+
+        // If user is removed, their 'approved' application could be marked as 'revoked' or 'rejected'.
+        // For now, we'll keep it simple: their application status won't change automatically.
+        // They would need to re-apply if they wanted to join again through the application system.
+        // Or, an admin could change their application status manually if a UI for that existed.
+
+        if (groupUpdateResult.modifiedCount > 0 || userUpdateResult.modifiedCount > 0) {
+            res.json({ msg: `Lietotājs ${user.firstName} ${user.lastName} veiksmīgi noņemts no grupas '${group.name}'.` });
+        } else {
+            res.json({ msg: `Lietotājs ${user.firstName} ${user.lastName} nebija grupā '${group.name}' vai izmaiņas netika veiktas.` });
+        }
+
+    } catch (error) {
+        console.error('Error removing member from group:', error);
+        res.status(500).json({ msg: 'Servera kļūda, noņemot dalībnieku no grupas.' });
     }
 });
 
