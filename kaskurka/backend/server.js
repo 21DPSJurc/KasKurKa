@@ -9,7 +9,8 @@ const authRoutes = require('./routes/authRoutes');
 const homeworkRoutes = require('./routes/homeworkRoutes'); 
 const testRoutes = require('./routes/testRoutes');         
 const progressRoutes = require('./routes/progressRoutes'); 
-const commentRoutes = require('./routes/commentRoutes'); // Added
+const commentRoutes = require('./routes/commentRoutes'); 
+const groupRoutes = require('./routes/groupRoutes'); // Added
 
 const app = express();
 
@@ -27,7 +28,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/homework', homeworkRoutes); 
 app.use('/api/tests', testRoutes);         
 app.use('/api/progress', progressRoutes); 
-app.use('/api/comments', commentRoutes); // Added
+app.use('/api/comments', commentRoutes); 
+app.use('/api/groups', groupRoutes); // Added
 
 
 const PORT = process.env.PORT || 5000;

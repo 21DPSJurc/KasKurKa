@@ -3,27 +3,23 @@
   <div id="app-container">
     <header class="app-header" v-if="!currentUser || !isDashboardRelatedView(currentView)">
       <h1>KasKurKa</h1>
-       <div v-if="currentUser" class="user-greeting">
-        Sveiki, {{ currentUser.firstName }}!
+       <div class="header-user-info">
+        <router-link v-if="currentUser && currentUser.role === 'admin' && currentView !== 'adminDashboard'" to="#" @click.prevent="navigateToAdminDashboard" class="admin-panel-link">Admin Panelis</router-link>
+        <div v-if="currentUser" class="user-greeting">Sveiki, {{ currentUser.firstName }}!</div>
       </div>
     </header>
     <header class="app-header dashboard-app-header" v-else-if="currentUser && isDashboardRelatedView(currentView)">
       <h1>KasKurKa</h1>
-      <div v-if="currentUser" class="user-greeting">
-        Sveiki, {{ currentUser.firstName }}!
+      <div class="header-user-info">
+        <router-link v-if="currentUser && currentUser.role === 'admin' && currentView !== 'adminDashboard'" to="#" @click.prevent="navigateToAdminDashboard" class="admin-panel-link">Admin Panelis</router-link>
+        <div v-if="currentUser" class="user-greeting">Sveiki, {{ currentUser.firstName }}!</div>
       </div>
     </header>
 
     <main class="app-main">
       <template v-if="currentView === 'home' && !currentUser">
         <section class="intro-section">
-          <p>
-            KasKurKa mājasdarbu pārvaldes sistēma ir izstrādāta, lai studenti
-            būtu spējīgi efektīvi pārvaldīt sava kursa mājasdarbus un palīdzēt
-            viens otram situācijās, kad mājasdarbi tika izteikti tikai mutiski
-            vai "paslēpti" grūti uztveramās mājaslapās, kā arī šī sistēma ļauj
-            nodot informāciju par gaidāmajiem pārbaudes darbu datumiem.
-          </p>
+          <p>Esiet sveicināti "KasKurKa" - sistēmā, kas palīdzēs jums un jūsu kursabiedriem sekot līdzi mājasdarbiem un pārbaudes darbiem. Šī platforma ir īpaši noderīga, ja informācija par uzdevumiem tiek dota mutiski vai ir izkaisīta dažādās vietās. Pievienojiet jaunus ierakstus, dalieties ar informāciju un pārliecinieties, ka nekas svarīgs nav palaists garām!</p>
         </section>
         <nav class="actions-nav">
           <button class="action-button" @click="navigateToLogin">Pieslēgties</button>
@@ -31,54 +27,43 @@
         </nav>
       </template>
 
-      <RegisterView
-        v-else-if="currentView === 'register'"
-        @navigateHome="showHome"
-        @registrationSuccess="handleRegistrationSuccess"
+      <RegisterView v-else-if="currentView === 'register'" @navigateHome="showHome" @registrationSuccess="handleRegistrationSuccess"/>
+      <LoginView v-else-if="currentView === 'login'" @navigateHome="showHome" @navigateToRegister="navigateToRegister" @loginSuccess="handleLoginSuccess"/>
+      
+      <!-- Student Views -->
+      <DashboardView v-if="currentView === 'dashboard' && currentUser && currentUser.role === 'student'" :currentUser="currentUser" @logout="handleLogout" @navigateToAddHomework="navigateToAddHomework" @navigateToAddTest="navigateToAddTest" @navigateToHomeworkList="navigateToHomeworkList" @navigateToGroupList="navigateToGroupList"/>
+      <AddHomeworkView v-else-if="currentView === 'addHomework' && currentUser" :item-id-to-edit="editingItemId" @itemActionSuccess="handleItemActionSuccess" @navigateToDashboard="navigateToDashboard" @cancelEdit="cancelEdit"/>
+      <AddTestView v-else-if="currentView === 'addTest' && currentUser" :item-id-to-edit="editingItemId" @itemActionSuccess="handleItemActionSuccess" @navigateToDashboard="navigateToDashboard" @cancelEdit="cancelEdit"/>
+      <HomeworkListView v-else-if="currentView === 'homeworkList' && currentUser" :current-user-id="currentUser ? currentUser.id : null" @navigateToDashboard="navigateToStudentDashboard" @editItem="navigateToEditItem" @itemDeleted="handleItemDeletedInList"/>
+      <GroupListView v-else-if="currentView === 'groupList' && currentUser" 
+        :current-user="currentUser" 
+        @navigateToDashboard="navigateToStudentDashboard" />
+
+
+      <!-- Admin Views -->
+      <AdminDashboardView 
+        v-else-if="currentView === 'adminDashboard' && currentUser && currentUser.role === 'admin'" 
+        @logout="handleLogout" 
+        @navigateToCreateGroup="navigateToCreateGroup" 
+        @navigateToStudentDashboard="navigateToStudentDashboard"
+        @navigateToManageGroupApplications="navigateToManageGroupApplications" 
       />
-      <LoginView
-        v-else-if="currentView === 'login'"
-        @navigateHome="showHome"
-        @navigateToRegister="navigateToRegister"
-        @loginSuccess="handleLoginSuccess"
+      <CreateGroupView 
+        v-else-if="currentView === 'createGroup' && currentUser && currentUser.role === 'admin'" 
+        @groupCreated="handleGroupCreated" 
+        @navigateToAdminDashboard="navigateToAdminDashboard" 
       />
-      <DashboardView
-        v-else-if="currentView === 'dashboard' && currentUser"
-        :currentUser="currentUser"
-        @logout="handleLogout"
-        @navigateToAddHomework="navigateToAddHomework"
-        @navigateToAddTest="navigateToAddTest"
-        @navigateToHomeworkList="navigateToHomeworkList"
+      <ManageGroupApplicationsView 
+        v-else-if="currentView === 'manageGroupApplications' && currentUser && currentUser.role === 'admin'"
+        @navigateToAdminDashboard="navigateToAdminDashboard"
       />
-      <AddHomeworkView
-        v-else-if="currentView === 'addHomework' && currentUser"
-        :item-id-to-edit="editingItemId"
-        @itemActionSuccess="handleItemActionSuccess"
-        @navigateToDashboard="navigateToDashboard"
-        @cancelEdit="cancelEdit"
-      />
-      <AddTestView
-        v-else-if="currentView === 'addTest' && currentUser"
-        :item-id-to-edit="editingItemId"
-        @itemActionSuccess="handleItemActionSuccess"
-        @navigateToDashboard="navigateToDashboard"
-        @cancelEdit="cancelEdit"
-      />
-      <HomeworkListView
-        v-else-if="currentView === 'homeworkList' && currentUser"
-        :current-user-id="currentUser ? currentUser.id : null"
-        @navigateToDashboard="navigateToDashboard"
-        @editItem="navigateToEditItem"
-        @itemDeleted="handleItemDeletedInList"
-      />
+
 
       <div v-else-if="isLoadingAuth"><p>Notiek ielāde...</p></div>
       <div v-else></div>
     </main>
 
-    <footer class="app-footer">
-      <p>© {{ new Date().getFullYear() }} KasKurKa. Visas tiesības aizsargātas.</p>
-    </footer>
+    <footer class="app-footer"><p>© {{ new Date().getFullYear() }} KasKurKa. Visas tiesības aizsargātas.</p></footer>
   </div>
 </template>
 
@@ -89,66 +74,113 @@ import DashboardView from "./views/DashboardView.vue";
 import AddHomeworkView from "./views/AddHomeworkView.vue";
 import AddTestView from "./views/AddTestView.vue";
 import HomeworkListView from "./views/HomeworkListView.vue"; 
+import GroupListView from "./views/GroupListView.vue"; 
+import AdminDashboardView from "./views/AdminDashboardView.vue"; 
+import CreateGroupView from "./views/CreateGroupView.vue";  
+import ManageGroupApplicationsView from "./views/ManageGroupApplicationsView.vue"; // New import
 import axios from 'axios'; 
 
 export default {
   name: "App",
-  components: { RegisterView, LoginView, DashboardView, AddHomeworkView, AddTestView, HomeworkListView },
-  data() {
+  components: { 
+    RegisterView, LoginView, 
+    DashboardView, AddHomeworkView, AddTestView, HomeworkListView, GroupListView,
+    AdminDashboardView, CreateGroupView, ManageGroupApplicationsView // Added ManageGroupApplicationsView
+  },
+  data() { 
     return {
       currentView: "home", 
       currentUser: null,   
       isLoadingAuth: true, 
-      dashboardRelatedViews: ['dashboard', 'addHomework', 'addTest', 'homeworkList'],
-      editingItemId: null, // Will store ID of item being edited
-      editingItemType: null, // 'homework' or 'test'
+      dashboardRelatedViews: [
+        'dashboard', 'addHomework', 'addTest', 'homeworkList', 
+        'adminDashboard', 'createGroup', 'groupList', 'manageGroupApplications' // Added manageGroupApplications
+      ],
+      editingItemId: null, 
+      editingItemType: null, 
     };
   },
   created() { this.tryAutoLogin(); },
-  methods: {
+  methods: { 
     isDashboardRelatedView(viewName) { return this.dashboardRelatedViews.includes(viewName); },
-    tryAutoLogin() { /* ... as before ... */ 
+    tryAutoLogin() { 
       this.isLoadingAuth = true;
       const token = localStorage.getItem("token");
       const userString = localStorage.getItem("user");
-
       if (token && userString) {
         try {
           const user = JSON.parse(userString);
-          this.currentUser = user; // user object should contain id, firstName, group etc.
+          this.currentUser = user; 
           axios.defaults.headers.common['Authorization'] = `Bearer ${token}`; 
-          this.currentView = "dashboard";
-        } catch (e) {
-          console.error("Error parsing user from localStorage:", e);
-          this.handleLogout(); 
+          if (user.role === 'admin') {
+            // Keep admin on adminDashboard, unless another admin view was active
+            // This part might need adjustment if we want to "remember" the exact admin sub-view
+            if (!this.dashboardRelatedViews.includes(this.currentView) || this.currentView === 'dashboard') {
+                 this.currentView = "adminDashboard";
+            }
+          } else {
+            // Keep student on student dashboard or related views
+             if (!this.dashboardRelatedViews.includes(this.currentView) || this.currentView === 'adminDashboard' || this.currentView === 'createGroup' || this.currentView === 'manageGroupApplications') {
+                this.currentView = "dashboard"; 
+            }
+          }
+        } catch (e) { 
+            console.error("Auto-login error:", e); this.handleLogout(); 
         }
-      } else {
-        this.currentView = "home"; 
-      }
+      } else { this.currentView = "home"; }
       this.isLoadingAuth = false;
     },
     navigateToLogin() { this.currentView = "login"; this.clearEditState(); },
     navigateToRegister() { this.currentView = "register"; this.clearEditState(); },
     showHome() { this.currentView = "home"; this.clearEditState(); },
-    navigateToDashboard() {
-      if (this.currentUser) this.currentView = "dashboard";
-      else this.navigateToLogin();
-      this.clearEditState();
+    
+    navigateToUserSpecificDashboard() {
+        if (this.currentUser) {
+            this.currentView = this.currentUser.role === 'admin' ? 'adminDashboard' : 'dashboard';
+        } else {
+            this.navigateToLogin();
+        }
+        this.clearEditState();
     },
-    handleRegistrationSuccess() { /* ... as before ... */ 
+    navigateToDashboard() { 
+        if (this.currentUser && this.currentUser.role === 'student') {
+            this.currentView = "dashboard";
+        } else if (this.currentUser && this.currentUser.role === 'admin') {
+            this.navigateToAdminDashboard(); // Admins go to admin dashboard by default
+            return;
+        }
+         else {
+            this.navigateToLogin();
+        }
+        this.clearEditState();
+    },
+    navigateToStudentDashboard() { 
+        if (this.currentUser) { // Admin can also view student dashboard
+             this.currentView = "dashboard"; 
+        } else {
+            this.navigateToLogin();
+        }
+        this.clearEditState();
+    },
+
+    handleRegistrationSuccess() { 
         this.currentView = "login";
         alert("Reģistrācija veiksmīga! Lūdzu, pieslēdzieties.");
         this.clearEditState();
     },
-    handleLoginSuccess(authData) { /* ... as before ... */ 
-      this.currentUser = authData.user;
+    handleLoginSuccess(authData) { 
+      this.currentUser = authData.user; 
       localStorage.setItem("token", authData.token);
-      localStorage.setItem("user", JSON.stringify(authData.user)); // Store full user object
+      localStorage.setItem("user", JSON.stringify(authData.user)); 
       axios.defaults.headers.common['Authorization'] = `Bearer ${authData.token}`; 
-      this.currentView = "dashboard";
+      if (this.currentUser.role === 'admin') {
+        this.currentView = "adminDashboard";
+      } else {
+        this.currentView = "dashboard"; 
+      }
       this.clearEditState();
     },
-    handleLogout() { /* ... as before ... */ 
+    handleLogout() { 
       this.currentUser = null;
       localStorage.removeItem("token");
       localStorage.removeItem("user");
@@ -159,74 +191,95 @@ export default {
     },
     navigateToAddHomework() {
       if (this.currentUser) {
-        this.clearEditState(); // Ensure we are in "add" mode
+        this.clearEditState(); 
         this.currentView = "addHomework";
       } else this.navigateToLogin();
     },
     navigateToAddTest() {
       if (this.currentUser) {
-        this.clearEditState(); // Ensure we are in "add" mode
+        this.clearEditState(); 
         this.currentView = "addTest";
       } else this.navigateToLogin();
     },
-    navigateToEditItem({itemId, itemType}) {
+    navigateToEditItem({itemId, itemType}) { 
         if (this.currentUser) {
             this.editingItemId = itemId;
             this.editingItemType = itemType;
-            if (itemType === 'homework') {
-                this.currentView = 'addHomework'; // Re-use AddHomeworkView for editing
-            } else if (itemType === 'test') {
-                this.currentView = 'addTest'; // Re-use AddTestView for editing
-            }
-        } else {
-            this.navigateToLogin();
-        }
+            this.currentView = itemType === 'homework' ? 'addHomework' : 'addTest';
+        } else { this.navigateToLogin(); }
     },
-    cancelEdit() { // Called from AddHomeworkView/AddTestView when in edit mode
+    cancelEdit() { 
         this.clearEditState();
-        this.navigateToHomeworkList(); // Or dashboard, depending on preferred flow
+        // Navigate back to the list view from where editing was initiated
+        this.navigateToHomeworkList(); // Assuming editing is always from HomeworkList
     },
-    clearEditState() {
-        this.editingItemId = null;
-        this.editingItemType = null;
-    },
+    clearEditState() { this.editingItemId = null; this.editingItemType = null; },
     handleItemActionSuccess(message) { 
-      // This is called by AddHomeworkView/AddTestView after successful add OR edit
       alert(message || "Darbība veiksmīga!"); 
       this.clearEditState();
-      // If previous view was list, go back to list, otherwise dashboard
-      // For simplicity, always go to list after add/edit if list exists.
-      // Or just always to dashboard. Let's make it homeworkList for now.
-      if (this.currentView === 'addHomework' || this.currentView === 'addTest') {
-          this.navigateToHomeworkList();
-      } else {
-          this.navigateToDashboard();
-      }
+      // After successful add/edit, navigate to the list view
+      this.navigateToHomeworkList();
     },
     navigateToHomeworkList() {
       if (this.currentUser) {
         this.currentView = "homeworkList"; 
         this.clearEditState();
-      } else {
-        this.navigateToLogin();
-      }
+      } else { this.navigateToLogin(); }
     },
-    handleItemDeletedInList(message) {
-        alert(message || "Ieraksts dzēsts.");
-        // The list view itself will re-fetch or remove the item locally.
-        // No view change needed here unless we want to navigate away from list.
+    navigateToGroupList() { 
+        if (this.currentUser) {
+            this.currentView = "groupList";
+            this.clearEditState();
+        } else {
+            this.navigateToLogin();
+        }
+    },
+    handleItemDeletedInList(message) { alert(message || "Ieraksts dzēsts."); },
+
+    // Admin specific navigation
+    navigateToAdminDashboard() {
+        if (this.currentUser && this.currentUser.role === 'admin') {
+            this.currentView = "adminDashboard";
+        } else {
+            // If not admin, or no user, redirect to home/login
+            this.showHome(); 
+        }
+        this.clearEditState();
+    },
+    navigateToCreateGroup() {
+        if (this.currentUser && this.currentUser.role === 'admin') {
+            this.currentView = "createGroup";
+        } else {
+            this.navigateToLogin(); // Or show an unauthorized message
+        }
+        this.clearEditState(); 
+    },
+    handleGroupCreated(message) {
+        alert(message || "Grupa veiksmīgi izveidota!");
+        this.navigateToAdminDashboard(); // Navigate back to admin dash after creation
+    },
+    navigateToManageGroupApplications() { // New method
+        if (this.currentUser && this.currentUser.role === 'admin') {
+            this.currentView = "manageGroupApplications";
+        } else {
+            this.navigateToLogin();
+        }
+        this.clearEditState();
     }
   },
 };
 </script>
 
 <style>
-/* Global styles remain the same */
+/* Styles as before */
 body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; color: #333; line-height: 1.6; }
 #app-container { display: flex; flex-direction: column; min-height: 100vh; text-align: center; }
 .app-header { background-color: #2c3e50; color: #ecf0f1; padding: 20px 0; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); display: flex; justify-content: space-around; align-items: center; }
-.app-header h1 { margin: 0; font-size: 2.5em; text-align: center; }
-.user-greeting { font-size: 1em; margin-right: 20px; }
+.app-header h1 { margin: 0; font-size: 2.5em; text-align: center; flex-grow: 1; }
+.header-user-info { display: flex; align-items: center; margin-right: 20px; }
+.user-greeting { font-size: 1em; margin-left: 15px; }
+.admin-panel-link { color: #f1c40f; text-decoration: none; font-weight: bold; margin-left:15px; }
+.admin-panel-link:hover { text-decoration: underline; }
 .app-main { flex-grow: 1; padding: 20px; margin: 0 auto; width: 100%; display: flex; flex-direction: column; align-items: center; }
 .app-main > .intro-section { max-width: 800px; background-color: #fff; border-radius: 8px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.05); padding: 20px; width: 100%; }
 .intro-section p { font-size: 1.1em; color: #555; margin-bottom: 30px; padding: 0 15px; text-align: left; }
@@ -252,6 +305,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helve
 .back-button:hover { text-decoration: underline; }
 .form-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 20px; }
 .required-field { color: #e74c3c; margin-left: 2px; }
-@media (max-width: 768px) { .app-header { flex-direction: column; } .app-header h1 { margin-bottom: 10px; } .user-greeting { margin-right: 0; margin-bottom: 10px; } .form-view { margin: 20px 10px; padding: 20px; } }
+@media (max-width: 768px) { .app-header { flex-direction: column; } .app-header h1 { margin-bottom: 10px; } .user-greeting { margin-right: 0; margin-bottom: 10px; } .admin-panel-link { margin-right: 0; margin-bottom: 10px;} .header-user-info { flex-direction: column; align-items: center; margin-right:0;} .form-view { margin: 20px 10px; padding: 20px; } }
 @media (max-width: 600px) { .app-header h1 { font-size: 2em; } .intro-section p { font-size: 1em; } .app-main > .intro-section { margin: 10px; padding: 15px; } .action-button { padding: 10px 15px; font-size: 0.9em; display: block; width: calc(100% - 20px); max-width: 300px; margin: 10px auto; } .app-main { padding: 10px; } .form-group input[type="text"], .form-group input[type="email"], .form-group input[type="password"], .form-group input[type="number"], .form-group input[type="date"], .form-group input[type="time"], .form-group textarea, .form-group select { font-size: 0.95em; } .form-actions { flex-direction: column-reverse; } .form-actions .action-button { width: 100%; margin-bottom: 10px; } .form-actions .back-button { margin-bottom: 15px; align-self: flex-start; } }
 </style>
