@@ -54,26 +54,79 @@
           </p>
           <p v-else class="group-description italic">Apraksts nav pieejams.</p>
           <small>Izveidota: {{ formatDate(group.createdAt) }}</small>
-          <p
-            v-if="
-              getApplicationStatusForGroup(group._id) && !isMemberOfGroup(group)
-            "
-            class="application-status"
+
+          <div
+            v-if="getApplicationDetails(group._id) && !isMemberOfGroup(group)"
+            class="application-info"
           >
-            Jūsu pieteikuma statuss:
-            <strong>{{
-              getStatusText(getApplicationStatusForGroup(group._id))
-            }}</strong>
-          </p>
+            <p class="application-status">
+              Jūsu pieteikuma statuss:
+              <strong>
+                {{ getStatusText(getApplicationDetails(group._id).status) }}
+              </strong>
+            </p>
+            <p
+              v-if="getApplicationDetails(group._id).message"
+              class="application-message"
+            >
+              Jūsu ziņa:
+              <em>"{{ getApplicationDetails(group._id).message }}"</em>
+            </p>
+          </div>
         </div>
+
         <div class="item-actions">
+          <div
+            v-if="
+              showApplyFormFor === group._id &&
+              !isMemberOfGroup(group) &&
+              getApplicationStatusForGroup(group._id) !== 'pending'
+            "
+          >
+            <div class="form-group application-message-group">
+              <label :for="'apply-message-' + group._id"
+                >Ziņa administratoram (neobligāti, līdz 500 rakstzīmēm):</label
+              >
+              <textarea
+                :id="'apply-message-' + group._id"
+                v-model="applicationMessages[group._id]"
+                rows="3"
+                maxlength="500"
+                :placeholder="
+                  getApplicationDetails(group._id) &&
+                  getApplicationDetails(group._id).message
+                    ? 'Iepriekšējā ziņa: ' +
+                      getApplicationDetails(group._id).message
+                    : 'Jūsu ziņa...'
+                "
+              ></textarea>
+            </div>
+            <button
+              class="action-button-small send-application"
+              @click="submitApplication(group._id)"
+              :disabled="isApplying"
+            >
+              {{ isApplying ? "Sūta..." : "Nosūtīt Pieteikumu" }}
+            </button>
+            <button
+              class="action-button-small cancel-apply"
+              @click="cancelApplyForm(group._id)"
+              :disabled="isApplying"
+            >
+              Atcelt
+            </button>
+          </div>
           <button
+            v-else
             class="action-button-small"
-            @click="applyToGroup(group._id)"
+            @click="toggleApplyForm(group._id)"
             :disabled="isButtonDisabled(group)"
           >
             {{ getButtonText(group) }}
           </button>
+        </div>
+        <div v-if="applyErrorMessages[group._id]" class="error-message-inline">
+          {{ applyErrorMessages[group._id] }}
         </div>
       </div>
     </div>
@@ -91,17 +144,20 @@ export default {
   data() {
     return {
       allGroups: [],
-      userApplications: [],
+      userApplications: [], // Stores full application objects from backend, including message
       isLoading: true,
       isApplying: false,
       errorMessage: "",
       membershipFilter: "all",
+      showApplyFormFor: null, // Stores groupId for which the apply form is shown
+      applicationMessages: {}, // { groupId: "message text" }
+      applyErrorMessages: {}, // { groupId: "error text" }
     };
   },
   computed: {
     filteredGroups() {
       if (!this.allGroups) return [];
-      let groupsToShow = [...this.allGroups]; // Create a new array to avoid mutating the original
+      let groupsToShow = [...this.allGroups];
 
       if (this.membershipFilter === "joined") {
         groupsToShow = groupsToShow.filter((group) =>
@@ -111,6 +167,7 @@ export default {
         groupsToShow = groupsToShow.filter((group) => {
           const isMember = this.isMemberOfGroup(group);
           const appStatus = this.getApplicationStatusForGroup(group._id);
+          // Available if not a member AND (no application OR application was rejected)
           return !isMember && (!appStatus || appStatus === "rejected");
         });
       }
@@ -127,7 +184,7 @@ export default {
       try {
         const [groupsRes, applicationsRes] = await Promise.all([
           axios.get("/api/groups"),
-          axios.get("/api/groups/applications/my"),
+          axios.get("/api/groups/applications/my"), // This now returns messages
         ]);
         this.allGroups = groupsRes.data;
         this.userApplications = applicationsRes.data;
@@ -156,23 +213,50 @@ export default {
       ) {
         return true;
       }
-      if (
-        group.members &&
-        this.currentUser &&
-        group.members.includes(this.currentUser.id)
-      ) {
-        return true;
-      }
-      const appStatus = this.getApplicationStatusForGroup(group._id);
-      if (appStatus === "approved") {
-        // If an application is approved, they are effectively a member
+      // Additionally check via userApplications if an application was 'approved'
+      // as currentUser.enrolledCustomGroups might not be immediately updated on frontend
+      const appDetails = this.getApplicationDetails(group._id);
+      if (appDetails && appDetails.status === "approved") {
         return true;
       }
       return false;
     },
+    getApplicationDetails(groupId) {
+      return this.userApplications.find((a) => a.groupId === groupId);
+    },
     getApplicationStatusForGroup(groupId) {
-      const app = this.userApplications.find((a) => a.groupId === groupId);
+      const app = this.getApplicationDetails(groupId);
       return app ? app.status : null;
+    },
+    toggleApplyForm(groupId) {
+      if (this.showApplyFormFor === groupId) {
+        this.showApplyFormFor = null; // Close if already open
+      } else {
+        this.showApplyFormFor = groupId;
+        // Pre-fill message if re-applying after rejection
+        const existingApp = this.getApplicationDetails(groupId);
+        if (
+          existingApp &&
+          existingApp.status === "rejected" &&
+          existingApp.message
+        ) {
+          this.applicationMessages = {
+            ...this.applicationMessages,
+            [groupId]: existingApp.message,
+          };
+        } else {
+          this.applicationMessages = {
+            ...this.applicationMessages,
+            [groupId]: "",
+          }; // Clear for new application
+        }
+        this.applyErrorMessages = { ...this.applyErrorMessages, [groupId]: "" }; // Clear previous error
+      }
+    },
+    cancelApplyForm(groupId) {
+      this.showApplyFormFor = null;
+      this.applicationMessages = { ...this.applicationMessages, [groupId]: "" };
+      this.applyErrorMessages = { ...this.applyErrorMessages, [groupId]: "" };
     },
     getButtonText(group) {
       if (this.isMemberOfGroup(group)) {
@@ -183,7 +267,7 @@ export default {
         return "Pieteikums Gaida";
       }
       if (status === "rejected") {
-        return "Pieteikties Atkārtoti"; // Changed text
+        return "Pieteikties Atkārtoti";
       }
       return "Pieteikties";
     },
@@ -196,24 +280,43 @@ export default {
       return map[statusKey] || statusKey;
     },
     isButtonDisabled(group) {
+      if (this.showApplyFormFor === group._id) return true; // Disable main button if form is open
       if (this.isMemberOfGroup(group)) return true;
       const status = this.getApplicationStatusForGroup(group._id);
-      // Disable if pending. 'approved' is covered by isMemberOfGroup.
-      // If rejected, button should be enabled.
       return status === "pending" || this.isApplying;
     },
-    async applyToGroup(groupId) {
+    async submitApplication(groupId) {
       this.isApplying = true;
-      this.errorMessage = "";
-      try {
-        const response = await axios.post(`/api/groups/${groupId}/apply`);
-        alert(response.data.msg);
+      this.applyErrorMessages = { ...this.applyErrorMessages, [groupId]: "" }; // Clear previous error for this group
 
-        // Refresh applications and potentially all groups
-        // Using fetchData will refresh both and re-evaluate computed properties
-        await this.fetchData();
+      const message = this.applicationMessages[groupId] || "";
+      if (message.length > 500) {
+        this.applyErrorMessages = {
+          ...this.applyErrorMessages,
+          [groupId]: "Ziņa nedrīkst pārsniegt 500 rakstzīmes.",
+        };
+        this.isApplying = false;
+        return;
+      }
+
+      try {
+        const response = await axios.post(`/api/groups/${groupId}/apply`, {
+          message,
+        });
+        alert(response.data.msg);
+        this.showApplyFormFor = null; // Close form
+        this.applicationMessages = {
+          ...this.applicationMessages,
+          [groupId]: "",
+        }; // Clear message input
+        await this.fetchData(); // Refresh all data
       } catch (error) {
-        alert(error.response?.data?.msg || "Kļūda piesakoties grupai.");
+        const errMsg = error.response?.data?.msg || "Kļūda piesakoties grupai.";
+        this.applyErrorMessages = {
+          ...this.applyErrorMessages,
+          [groupId]: errMsg,
+        };
+        alert(errMsg); // Also show in general alert for now
         console.error("Error applying to group:", error);
       } finally {
         this.isApplying = false;
@@ -268,15 +371,32 @@ export default {
   font-style: italic;
   color: #777;
 }
+
+.application-info {
+  margin-top: 8px;
+  padding: 8px;
+  background-color: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+}
 .application-status {
   font-size: 0.9em;
-  margin-top: 5px;
-  padding: 5px 8px;
+  padding: 2px 0px;
   border-radius: 4px;
-  background-color: #e9ecef;
-  border: 1px solid #ced4da;
   display: inline-block;
+  margin-bottom: 5px;
 }
+.application-message {
+  font-size: 0.85em;
+  color: #505050;
+  margin-top: 3px;
+  white-space: pre-wrap; /* To respect newlines in message */
+  word-break: break-word;
+}
+.application-message em {
+  color: #333;
+}
+
 .item-actions {
   margin-top: 15px;
   padding-top: 10px;
@@ -291,6 +411,7 @@ export default {
   border: none;
   color: white;
   background-color: #3498db;
+  margin-left: 5px; /* Spacing for multiple buttons */
 }
 .action-button-small:hover:not([disabled]) {
   background-color: #2980b9;
@@ -299,6 +420,18 @@ export default {
   background-color: #bdc3c7;
   cursor: not-allowed;
   opacity: 0.7;
+}
+.action-button-small.send-application {
+  background-color: #28a745; /* Green for send */
+}
+.action-button-small.send-application:hover:not([disabled]) {
+  background-color: #218838;
+}
+.action-button-small.cancel-apply {
+  background-color: #6c757d; /* Grey for cancel */
+}
+.action-button-small.cancel-apply:hover:not([disabled]) {
+  background-color: #5a6268;
 }
 
 .filters.group-filters {
@@ -318,5 +451,34 @@ export default {
 }
 .filters.group-filters .form-group select {
   width: 100%;
+}
+
+.application-message-group {
+  text-align: left;
+  margin-bottom: 10px;
+}
+.application-message-group label {
+  font-size: 0.9em;
+  color: #495057;
+}
+.application-message-group textarea {
+  width: calc(100% - 22px); /* Match global textarea style */
+  padding: 10px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  font-size: 0.95em;
+  min-height: 60px;
+  margin-top: 5px;
+}
+.error-message-inline {
+  display: block;
+  background-color: #fdd;
+  color: #e74c3c;
+  border: 1px solid #e74c3c;
+  padding: 8px;
+  margin-top: 10px;
+  border-radius: 4px;
+  font-size: 0.9em;
+  text-align: center;
 }
 </style>

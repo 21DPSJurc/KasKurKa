@@ -148,9 +148,6 @@ router.put('/:groupId', [authMiddleware, adminMiddleware], async (req, res) => {
         if (result.matchedCount === 0) { // Should not happen if previous check passed
             return res.status(404).json({ msg: 'Grupa netika atrasta atjaunināšanai.' });
         }
-        // if (result.modifiedCount === 0) {
-        //     return res.json({ msg: 'Izmaiņas netika veiktas (iespējams, dati ir tādi paši).', group: existingGroup });
-        // }
 
         const updatedGroup = await groupsCollection.findOne({ _id: groupObjectId });
         res.json({ msg: 'Grupa veiksmīgi atjaunināta!', group: updatedGroup });
@@ -216,9 +213,14 @@ router.post('/:groupId/apply', authMiddleware, async (req, res) => {
     const userId = new ObjectId(req.user.id);
     const userFirstName = req.user.firstName; // From JWT
     const userEmail = req.user.email;       // From JWT
+    const { message } = req.body; // New: Get message from request body
 
     if (!ObjectId.isValid(groupId)) {
         return res.status(400).json({ msg: 'Nederīgs grupas ID.' });
+    }
+
+    if (message && message.length > 500) { // Optional: Validate message length
+        return res.status(400).json({ msg: 'Pieteikuma ziņa nedrīkst pārsniegt 500 rakstzīmes.' });
     }
 
     try {
@@ -252,6 +254,8 @@ router.post('/:groupId/apply', authMiddleware, async (req, res) => {
             if (existingApplication.status === 'pending') {
                 return res.status(400).json({ msg: 'Jūsu pieteikums šai grupai jau ir reģistrēts un gaida apstiprinājumu.' });
             } else if (existingApplication.status === 'approved') {
+                // This scenario should ideally be caught by the enrolledCustomGroups check earlier
+                // or group.members check.
                 return res.status(400).json({ msg: 'Jūs jau esat apstiprināts šai grupai.' });
             }
         }
@@ -261,9 +265,10 @@ router.post('/:groupId/apply', authMiddleware, async (req, res) => {
             userId: userId,
             userFirstName: userFirstName,
             userEmail: userEmail,
+            message: message ? message.trim() : '', // New: Store the message
             status: 'pending',
             appliedAt: new Date(),
-            groupName: group.name
+            groupName: group.name // Storing groupName for easier display in application lists
         };
 
         await groupApplicationsCollection.insertOne(newApplication);
@@ -299,9 +304,10 @@ router.get('/applications/my', authMiddleware, async (req, res) => {
                 $project: {
                     _id: 1,
                     groupId: 1,
-                    groupName: '$groupInfo.name',
+                    groupName: '$groupInfo.name', // Keep groupName from application doc or fallback
                     status: 1,
                     appliedAt: 1,
+                    message: 1, // New: Include the message
                     userFirstName: 1,
                     userEmail: 1
                 }
@@ -342,17 +348,18 @@ router.get('/applications', [authMiddleware, adminMiddleware], async (req, res) 
             {
                 $unwind: {
                     path: "$groupDetails",
-                    preserveNullAndEmptyArrays: true
+                    preserveNullAndEmptyArrays: true // Keep applications even if group is deleted
                 }
             },
             {
                 $project: {
                     _id: 1,
                     groupId: 1,
-                    groupName: '$groupDetails.name',
+                    groupName: { $ifNull: ['$groupDetails.name', '$groupName'] }, // Use name from groupDetails if available, else from application
                     userId: 1,
                     userFirstName: 1,
                     userEmail: 1,
+                    message: 1, // New: Include the message
                     status: 1,
                     appliedAt: 1
                 }
@@ -396,6 +403,18 @@ router.put('/applications/:applicationId/approve', [authMiddleware, adminMiddlew
             return res.status(400).json({ msg: `Pieteikums jau ir ticis '${application.status}'.` });
         }
 
+        // Check if group still exists before adding member
+        const groupExists = await groupsCollection.findOne({ _id: application.groupId });
+        if (!groupExists) {
+            // If group doesn't exist, maybe reject application automatically or inform admin
+            await groupApplicationsCollection.updateOne(
+                { _id: appObjectId },
+                { $set: { status: 'rejected', processedAt: new Date(), processedBy: new ObjectId(req.user.id), reason: 'Grupa vairs neeksistē' } }
+            );
+            return res.status(404).json({ msg: 'Nevar apstiprināt pieteikumu: Grupa vairs neeksistē. Pieteikums automātiski noraidīts.' });
+        }
+
+
         const updateAppStatus = await groupApplicationsCollection.updateOne(
             { _id: appObjectId },
             { $set: { status: 'approved', processedAt: new Date(), processedBy: new ObjectId(req.user.id) } }
@@ -404,14 +423,16 @@ router.put('/applications/:applicationId/approve', [authMiddleware, adminMiddlew
             return res.status(500).json({ msg: 'Neizdevās atjaunināt pieteikuma statusu.' });
         }
 
+        // Add user to group's members list
         await groupsCollection.updateOne(
             { _id: application.groupId },
-            { $addToSet: { members: application.userId } }
+            { $addToSet: { members: application.userId } } // Use $addToSet to avoid duplicates
         );
 
+        // Add group to user's enrolledCustomGroups list
         await usersCollection.updateOne(
             { _id: application.userId },
-            { $addToSet: { enrolledCustomGroups: application.groupId } }
+            { $addToSet: { enrolledCustomGroups: application.groupId } } // Use $addToSet
         );
 
         res.json({ msg: 'Pieteikums veiksmīgi apstiprināts. Lietotājs pievienots grupai.' });
