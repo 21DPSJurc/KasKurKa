@@ -76,8 +76,10 @@
           id="subject"
           v-model="test.subject"
           required
+          maxlength="50"
           :disabled="isLoading"
         />
+        <small>Līdz 50 rakstzīmēm.</small>
       </div>
 
       <div class="form-group">
@@ -106,13 +108,15 @@
       </div>
 
       <div class="form-group">
-        <label for="topics">Pārbaudes darba tēmas:</label>
+        <label for="topics">Pārbaudes darba tēmas/apraksts:</label>
         <textarea
           id="topics"
           v-model="test.topics"
-          placeholder="Piemēram: Funkcijas, Masīvi, Klases"
+          placeholder="Piemēram: Funkcijas, Masīvi, Klases. Līdz 1000 rakstzīmēm."
+          maxlength="1000"
           :disabled="isLoading"
         ></textarea>
+        <small>Līdz 1000 rakstzīmēm.</small>
       </div>
 
       <div class="form-group">
@@ -198,7 +202,7 @@ export default {
         subject: "",
         eventDate: `${year}-${month}-${day}`,
         eventTime: "",
-        topics: "",
+        topics: "", // This can serve as 'description' for tests
         format: "",
         additionalInfo: "",
         customGroupId: "",
@@ -380,7 +384,8 @@ export default {
     validateClientSideForm() {
       if (
         (this.errorMessage && this.errorMessage.startsWith("Lūdzu")) ||
-        this.errorMessage.startsWith("Norādītais laiks")
+        this.errorMessage.startsWith("Norādītais laiks") ||
+        this.errorMessage.includes("rakstzīmes")
       ) {
         this.errorMessage = "";
       }
@@ -393,6 +398,17 @@ export default {
       }
       if (!this.test.subject.trim()) {
         this.errorMessage = "Mācību priekšmets ir obligāts lauks.";
+        return false;
+      }
+      if (this.test.subject.trim().length > 50) {
+        this.errorMessage =
+          "Mācību priekšmeta nosaukums nedrīkst pārsniegt 50 rakstzīmes.";
+        return false;
+      }
+      // 'topics' field serves as description for tests.
+      if (this.test.topics && this.test.topics.trim().length > 1000) {
+        this.errorMessage =
+          "Pārbaudes darba tēmas/apraksts nedrīkst pārsniegt 1000 rakstzīmes.";
         return false;
       }
       if (!this.test.eventDate) {
@@ -417,7 +433,8 @@ export default {
       if (
         this.errorMessage &&
         (this.errorMessage.startsWith("Lūdzu") ||
-          this.errorMessage.startsWith("Norādītais laiks"))
+          this.errorMessage.startsWith("Norādītais laiks") ||
+          this.errorMessage.includes("rakstzīmes"))
       ) {
         this.errorMessage = "";
       }

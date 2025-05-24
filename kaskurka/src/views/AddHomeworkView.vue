@@ -72,8 +72,10 @@
           id="subject"
           v-model="homework.subject"
           required
+          maxlength="50"
           :disabled="isLoading"
         />
+        <small>Līdz 50 rakstzīmēm.</small>
       </div>
 
       <div class="form-group">
@@ -85,8 +87,10 @@
           id="description"
           v-model="homework.description"
           required
+          maxlength="1000"
           :disabled="isLoading"
         ></textarea>
+        <small>Līdz 1000 rakstzīmēm.</small>
       </div>
 
       <div class="form-group">
@@ -491,8 +495,18 @@ export default {
         this.errorMessage = "Mācību priekšmets ir obligāts lauks.";
         return false;
       }
+      if (this.homework.subject.trim().length > 50) {
+        this.errorMessage =
+          "Mācību priekšmeta nosaukums nedrīkst pārsniegt 50 rakstzīmes.";
+        return false;
+      }
       if (!this.homework.description.trim()) {
         this.errorMessage = "Uzdevuma apraksts ir obligāts lauks.";
+        return false;
+      }
+      if (this.homework.description.trim().length > 1000) {
+        this.errorMessage =
+          "Uzdevuma apraksts nedrīkst pārsniegt 1000 rakstzīmes.";
         return false;
       }
       if (!this.homework.dueDate) {
@@ -526,7 +540,8 @@ export default {
         (this.errorMessage.startsWith("Lūdzu") ||
           this.errorMessage.startsWith("Saite") ||
           this.errorMessage.startsWith("Jūs varat") ||
-          this.errorMessage.startsWith("Fails"))
+          this.errorMessage.startsWith("Fails") ||
+          this.errorMessage.includes("rakstzīmes"))
       ) {
         this.errorMessage = "";
       }
