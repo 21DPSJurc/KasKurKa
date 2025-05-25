@@ -3,21 +3,36 @@
     <header class="dashboard-view-header">
       <div class="header-content">
         <h2 class="view-title">
-          <i class="fas fa-tachometer-alt"></i> Mans Panelis
+          <i class="fas fa-tachometer-alt"></i>
+          {{
+            isAdminViewingAsStudent
+              ? "Studentu Panelis (Admina Skats)"
+              : "Mans Panelis"
+          }}
         </h2>
         <button
+          v-if="!isAdminViewingAsStudent"
           @click="logout"
           class="action-button danger-button logout-button"
         >
           <i class="fas fa-sign-out-alt"></i> Iziet
         </button>
+        <div v-if="isAdminViewingAsStudent" class="admin-view-notice">
+          <i class="fas fa-info-circle"></i> Jūs redzat studentu paneli. Dati
+          tiek rādīti ar administratora tiesībām.
+        </div>
       </div>
     </header>
 
     <section class="dashboard-intro">
-      <p>
+      <p v-if="!isAdminViewingAsStudent">
         Sveicināti KasKurKa! Šeit jūs varat ērti pārvaldīt savus mācību darbus,
         sekot līdzi termiņiem un sadarboties ar kursabiedriem.
+      </p>
+      <p v-else>
+        Šis ir studentu paneļa priekšskatījums. Šeit varat redzēt, kā studenti
+        mijiedarbojas ar sistēmu. Ņemiet vērā, ka datu apjoms (piem., mājasdarbu
+        saraksts) atspoguļo jūsu administratora tiesības (redzat visu).
       </p>
     </section>
 
@@ -53,6 +68,9 @@
         <div class="upcoming-column card-style-inner">
           <h4>
             <i class="fas fa-book-reader icon-homework"></i> Tuvākie Mājasdarbi
+            <span v-if="isAdminViewingAsStudent" class="admin-scope-indicator"
+              >(Admina Skats)</span
+            >
           </h4>
           <ul v-if="upcomingHomeworks.length > 0" class="upcoming-list">
             <li
@@ -81,6 +99,9 @@
         <div class="upcoming-column card-style-inner">
           <h4>
             <i class="fas fa-feather-alt icon-test"></i> Tuvākie Pārbaudes Darbi
+            <span v-if="isAdminViewingAsStudent" class="admin-scope-indicator"
+              >(Admina Skats)</span
+            >
           </h4>
           <ul v-if="upcomingTests.length > 0" class="upcoming-list">
             <li
@@ -133,6 +154,11 @@ export default {
   name: "DashboardView",
   props: {
     currentUser: Object,
+    isAdminViewingAsStudent: {
+      // New prop
+      type: Boolean,
+      default: false,
+    },
   },
   data() {
     return {
@@ -162,6 +188,8 @@ export default {
     async fetchUpcomingItems() {
       this.isLoadingItems = true;
       this.fetchError = "";
+      // API calls will use the admin token if admin is viewing as student.
+      // Backend will return all items for admin.
       try {
         const [homeworkRes, testsRes] = await Promise.all([
           axios.get("/api/homework"),
@@ -190,19 +218,20 @@ export default {
       }
     },
     navigateToItemDetails(itemId, itemType) {
-      // This implies that App.vue needs a way to show item details,
-      // or HomeworkListView handles showing a single item.
-      // For now, let's assume clicking these items navigates to the full list
-      // where more details can be accessed or individual items clicked.
-      // Or, a new view "ItemDetailView" could be created.
-      // For simplicity, let's navigate to the HomeworkListView and the user can find it there.
-      // A more advanced implementation would pass the itemId and itemType to a detail view.
       console.log(`Navigate to details for ${itemType} ID: ${itemId}`);
-      this.$emit("navigateToHomeworkList"); // Simplest for now, could be enhanced.
+      this.$emit("navigateToHomeworkList");
     },
   },
-  mounted() {
-    this.fetchUpcomingItems();
+  watch: {
+    // Watch for currentUser changes, especially if admin switches to student view after component is mounted.
+    // Or if user logs out and this component was somehow still active (less likely with current App.vue logic)
+    currentUser: {
+      handler() {
+        this.fetchUpcomingItems();
+      },
+      deep: true, // In case currentUser internal properties change that affect data fetching
+      immediate: true, // Fetch on initial mount
+    },
   },
 };
 </script>
@@ -222,6 +251,8 @@ export default {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap; /* Allow wrapping if space is tight */
+  gap: 0.5rem;
 }
 .dashboard-view-header .view-title {
   color: var(--header-bg-color);
@@ -231,7 +262,20 @@ export default {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  flex-grow: 1; /* Allow title to take space */
 }
+.admin-view-notice {
+  font-size: 0.85rem;
+  color: var(--warning-color);
+  background-color: rgba(255, 193, 7, 0.1);
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--border-radius);
+  border: 1px solid var(--warning-color);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .logout-button {
   /* Using global .action-button and specific .danger-button */
 }
@@ -329,6 +373,12 @@ export default {
   display: flex;
   align-items: center;
   gap: 0.6rem;
+}
+.admin-scope-indicator {
+  font-size: 0.7rem;
+  font-weight: normal;
+  color: var(--secondary-color);
+  margin-left: 0.5em;
 }
 .icon-homework {
   color: var(--primary-color);

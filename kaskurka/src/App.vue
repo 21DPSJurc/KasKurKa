@@ -21,12 +21,14 @@
           >
             <i class="fas fa-user-circle"></i> Mans Profils
           </router-link>
+
           <router-link
             v-if="
               currentUser &&
               currentUser.role === 'admin' &&
               !isAdminSpecificView(currentView) &&
-              !isMyProfileView(currentView)
+              !isMyProfileView(currentView) &&
+              !isAdminViewingAsStudent
             "
             to="#"
             @click.prevent="navigateToAdminDashboard"
@@ -34,12 +36,26 @@
           >
             <i class="fas fa-shield-alt"></i> Admin Panelis
           </router-link>
+
+          <button
+            v-if="
+              currentUser &&
+              currentUser.role === 'admin' &&
+              isAdminViewingAsStudent
+            "
+            @click="returnToAdminView"
+            class="header-link return-to-admin-link action-button"
+          >
+            <i class="fas fa-user-shield"></i> Atgriezties Admin Panelī
+          </button>
+
           <div v-if="currentUser" class="user-greeting">
             <i class="fas fa-hand-sparkles"></i> Sveiki,
             {{ currentUser.firstName }}!
             <span
               v-if="
                 currentUser.role === 'student' &&
+                !isAdminViewingAsStudent && // Don't show student groups if admin is viewing as student with admin's actual data
                 currentUser.enrolledCustomGroupsDetails &&
                 currentUser.enrolledCustomGroupsDetails.length > 0
               "
@@ -53,10 +69,21 @@
               }})
             </span>
             <span
-              v-else-if="currentUser.role === 'student'"
+              v-else-if="
+                currentUser.role === 'student' && !isAdminViewingAsStudent
+              "
               class="user-group-display"
             >
               ({{ currentUser.group }})
+            </span>
+            <span
+              v-else-if="
+                currentUser.role === 'admin' && isAdminViewingAsStudent
+              "
+              class="user-group-display viewing-as-student-indicator"
+              title="Jūs pašlaik redzat studentu paneli ar administratora datu piekļuvi."
+            >
+              (Skatās kā Students)
             </span>
             <span v-else class="user-group-display">
               ({{ currentUser.group }})
@@ -119,9 +146,11 @@
         v-if="
           currentView === 'dashboard' &&
           currentUser &&
-          currentUser.role === 'student'
+          (currentUser.role === 'student' ||
+            (currentUser.role === 'admin' && isAdminViewingAsStudent))
         "
         :currentUser="currentUser"
+        :is-admin-viewing-as-student="isAdminViewingAsStudent"
         @logout="handleLogout"
         @navigateToAddHomework="navigateToAddHomework"
         @navigateToAddTest="navigateToAddTest"
@@ -147,6 +176,7 @@
       <HomeworkListView
         v-else-if="currentView === 'homeworkList' && currentUser"
         :current-user-id="currentUser ? currentUser.id : null"
+        :current-user-role="currentUser ? currentUser.role : null"
         @navigateToDashboard="navigateToUserSpecificDashboard"
         @editItem="navigateToEditItem"
         @itemDeleted="handleItemDeletedInList"
@@ -162,7 +192,8 @@
         v-else-if="
           currentView === 'adminDashboard' &&
           currentUser &&
-          currentUser.role === 'admin'
+          currentUser.role === 'admin' &&
+          !isAdminViewingAsStudent
         "
         :currentUser="currentUser"
         @logout="handleLogout"
@@ -288,6 +319,7 @@ export default {
       currentView: "home",
       currentUser: null,
       isLoadingAuth: true,
+      isAdminViewingAsStudent: false, // New flag
       dashboardRelatedViews: [
         "dashboard",
         "addHomework",
@@ -336,6 +368,17 @@ export default {
       try {
         const response = await axios.get("/api/auth/me/refresh");
         const refreshedUser = response.data;
+
+        // If admin was viewing as student, ensure this state is not lost upon refresh,
+        // unless the refresh itself implies a full session reset.
+        // For now, we assume a refresh might reset the isAdminViewingAsStudent state implicitly
+        // if the backend doesn't support maintaining this state.
+        // However, if the refresh is client-initiated to update details, keep the view mode.
+        // If `this.currentUser.id` changes, then it's a different user, reset.
+        if (this.currentUser.id !== refreshedUser.id) {
+          this.isAdminViewingAsStudent = false;
+        }
+
         this.currentUser = refreshedUser;
         localStorage.setItem("user", JSON.stringify(this.currentUser));
         console.log("[App.vue] User state refreshed:", this.currentUser);
@@ -345,7 +388,7 @@ export default {
           error.response &&
           (error.response.status === 401 || error.response.status === 403)
         ) {
-          this.handleLogout();
+          this.handleLogout(); // This will also reset isAdminViewingAsStudent
           throw new Error("User refresh failed, logged out.");
         }
         throw error;
@@ -371,14 +414,28 @@ export default {
           this.currentUser = user;
           axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
 
+          // Do not automatically reset isAdminViewingAsStudent here,
+          // as the user might have refreshed the page while in that mode.
+          // Let navigation methods handle it or a dedicated "stop viewing" action.
+
           if (
             this.currentView === "home" ||
             this.currentView === "login" ||
             this.currentView === "register"
           ) {
-            if (this.currentUser.role === "admin") {
+            // If already viewing as student from previous session and currentView is dashboard, stay
+            if (
+              this.isAdminViewingAsStudent &&
+              this.currentView === "dashboard"
+            ) {
+              // Maintain student dashboard view
+            } else if (
+              this.currentUser.role === "admin" &&
+              !this.isAdminViewingAsStudent
+            ) {
               this.currentView = "adminDashboard";
-            } else {
+            } else if (this.currentUser.role === "student") {
+              // if not admin, or admin not viewing as student
               this.currentView = "dashboard";
             }
           }
@@ -387,6 +444,7 @@ export default {
           this.handleLogout();
         }
       } else {
+        this.isAdminViewingAsStudent = false; // No token, no special view mode
         if (
           this.dashboardRelatedViews.includes(this.currentView) ||
           this.adminSpecificViews.includes(this.currentView) ||
@@ -401,18 +459,22 @@ export default {
     },
     navigateToLogin() {
       this.currentView = "login";
+      this.isAdminViewingAsStudent = false;
       this.clearAllEditStates();
     },
     navigateToRegister() {
       this.currentView = "register";
+      this.isAdminViewingAsStudent = false;
       this.clearAllEditStates();
     },
     showHome() {
       this.currentView = "home";
+      this.isAdminViewingAsStudent = false;
       this.clearAllEditStates();
     },
     navigateToMyProfile() {
       if (this.currentUser) {
+        this.isAdminViewingAsStudent = false; // Exit "view as student" when going to own profile
         this.currentView = "myProfile";
       } else {
         this.navigateToLogin();
@@ -421,23 +483,46 @@ export default {
     },
     navigateToUserSpecificDashboard() {
       if (this.currentUser) {
-        this.currentView =
-          this.currentUser.role === "admin" ? "adminDashboard" : "dashboard";
+        if (
+          this.currentUser.role === "admin" &&
+          !this.isAdminViewingAsStudent
+        ) {
+          this.currentView = "adminDashboard";
+        } else {
+          // Student, or Admin viewing as student
+          this.currentView = "dashboard";
+        }
       } else {
         this.navigateToLogin();
       }
       this.clearAllEditStates();
     },
     navigateToStudentDashboard() {
-      if (this.currentUser) {
+      // Called when admin clicks "Skatīt kā students"
+      if (this.currentUser && this.currentUser.role === "admin") {
+        this.isAdminViewingAsStudent = true;
         this.currentView = "dashboard";
+      } else if (this.currentUser && this.currentUser.role === "student") {
+        this.currentView = "dashboard"; // Normal student navigation
       } else {
         this.navigateToLogin();
       }
       this.clearAllEditStates();
     },
+    returnToAdminView() {
+      // New method for admin to return from student view
+      if (this.currentUser && this.currentUser.role === "admin") {
+        this.isAdminViewingAsStudent = false;
+        this.currentView = "adminDashboard";
+      } else {
+        // Should not happen if logic is correct, but handle gracefully
+        this.showHome();
+      }
+      this.clearAllEditStates();
+    },
     handleRegistrationSuccess() {
       this.currentView = "login";
+      this.isAdminViewingAsStudent = false;
       alert("Reģistrācija veiksmīga! Lūdzu, pieslēdzieties.");
       this.clearAllEditStates();
     },
@@ -448,6 +533,7 @@ export default {
       axios.defaults.headers.common[
         "Authorization"
       ] = `Bearer ${authData.token}`;
+      this.isAdminViewingAsStudent = false; // Reset on new login
       this.navigateToUserSpecificDashboard();
     },
     handleLogout() {
@@ -455,6 +541,7 @@ export default {
       localStorage.removeItem("token");
       localStorage.removeItem("user");
       delete axios.defaults.headers.common["Authorization"];
+      this.isAdminViewingAsStudent = false; // Reset this flag
       this.currentView = "home";
       alert("Jūs esat veiksmīgi izgājis no sistēmas.");
       this.clearAllEditStates();
@@ -488,12 +575,16 @@ export default {
     handleItemActionSuccess(message) {
       alert(message || "Darbība veiksmīga!");
       this.clearAllEditStates();
+      // If admin was viewing as student and added/edited an item, they might want to stay in student list view.
+      // Or return to the appropriate dashboard. For now, HomeworkList seems fine.
       this.navigateToHomeworkList();
     },
     navigateToHomeworkList() {
       if (this.currentUser) {
         this.currentView = "homeworkList";
-        this.clearAllEditStates();
+        // Do not clear isAdminViewingAsStudent here, let them stay in that "mode"
+        // unless they explicitly navigate back to admin panel or profile.
+        this.clearAllEditStates(); // Clear item edit states
       } else {
         this.navigateToLogin();
       }
@@ -511,14 +602,16 @@ export default {
     },
     navigateToAdminDashboard() {
       if (this.currentUser && this.currentUser.role === "admin") {
+        this.isAdminViewingAsStudent = false; // Explicitly exit "view as student" mode
         this.currentView = "adminDashboard";
       } else {
-        this.showHome();
+        this.showHome(); // If not admin, or no user, go home
       }
       this.clearAllEditStates();
     },
     navigateToCreateGroup() {
       if (this.currentUser && this.currentUser.role === "admin") {
+        this.isAdminViewingAsStudent = false; // Should be in admin mode for this
         this.currentView = "createGroup";
       } else {
         this.navigateToLogin();
@@ -527,10 +620,11 @@ export default {
     },
     handleGroupCreated(message) {
       alert(message || "Grupa veiksmīgi izveidota!");
-      this.navigateToAdminDashboard();
+      this.navigateToAdminDashboard(); // This will reset isAdminViewingAsStudent
     },
     navigateToManageGroupApplications() {
       if (this.currentUser && this.currentUser.role === "admin") {
+        this.isAdminViewingAsStudent = false;
         this.currentView = "manageGroupApplications";
       } else {
         this.navigateToLogin();
@@ -539,6 +633,7 @@ export default {
     },
     navigateToManageGroups() {
       if (this.currentUser && this.currentUser.role === "admin") {
+        this.isAdminViewingAsStudent = false;
         this.currentView = "manageGroups";
       } else {
         this.navigateToLogin();
@@ -547,6 +642,7 @@ export default {
     },
     navigateToEditGroup(groupId) {
       if (this.currentUser && this.currentUser.role === "admin") {
+        this.isAdminViewingAsStudent = false;
         this.clearAllEditStates();
         this.editingGroupId = groupId;
         this.currentView = "editGroup";
@@ -556,10 +652,11 @@ export default {
     },
     handleGroupUpdateSuccess(message) {
       alert(message || "Grupa veiksmīgi atjaunināta!");
-      this.navigateToManageGroups();
+      this.navigateToManageGroups(); // This will reset isAdminViewingAsStudent
     },
     navigateToManageUsers() {
       if (this.currentUser && this.currentUser.role === "admin") {
+        this.isAdminViewingAsStudent = false;
         this.currentView = "manageUsers";
       } else {
         this.navigateToLogin();
@@ -568,6 +665,7 @@ export default {
     },
     navigateToEditUser(userId) {
       if (this.currentUser && this.currentUser.role === "admin") {
+        this.isAdminViewingAsStudent = false;
         this.clearAllEditStates();
         this.editingUserId = userId;
         this.currentView = "editUser";
@@ -577,7 +675,7 @@ export default {
     },
     handleUserUpdateSuccess(message) {
       alert(message || "Lietotāja dati veiksmīgi atjaunināti!");
-      this.navigateToManageUsers();
+      this.navigateToManageUsers(); // This will reset isAdminViewingAsStudent
     },
     clearAllEditStates() {
       this.editingItemId = null;
@@ -708,6 +806,17 @@ body {
   background-color: var(--info-color);
 }
 
+.app-header .return-to-admin-link {
+  /* Style for the "Return to Admin Panel" button */
+  background-color: var(--warning-color); /* Or another distinct color */
+  color: var(--text-color); /* Dark text for yellow bg */
+  /* Inherits .action-button styles if that class is also applied */
+}
+.app-header .return-to-admin-link:hover {
+  background-color: #e0a800; /* Darker warning */
+  color: var(--text-color);
+}
+
 .app-header .user-greeting {
   font-size: 0.95rem;
   display: flex;
@@ -718,6 +827,11 @@ body {
   font-size: 0.85rem;
   opacity: 0.8;
   margin-left: 0.25rem;
+}
+.app-header .user-greeting .viewing-as-student-indicator {
+  font-weight: bold;
+  color: var(--warning-color); /* Make it stand out */
+  opacity: 1;
 }
 
 /* Main Content Styles */
@@ -969,7 +1083,9 @@ body {
     width: 100%;
     gap: 0.5rem;
   }
-  .app-header .header-link {
+  .app-header .header-link,
+  .app-header .return-to-admin-link {
+    /* Include new button */
     width: 100%;
     justify-content: center;
   }
