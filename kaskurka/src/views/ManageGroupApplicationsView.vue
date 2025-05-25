@@ -1,77 +1,123 @@
-<!-- kaskurka/src/views/ManageGroupApplicationsView.vue -->
 <template>
-  <div class="manage-group-applications-view form-view">
+  <div class="manage-group-applications-view card-style">
     <button
       @click="goBackToAdminDashboard"
       class="back-button"
       :disabled="isLoading || isProcessing"
     >
-      ← Atpakaļ uz Admin Paneli
+      <i class="fas fa-arrow-left"></i> Atpakaļ uz Admin Paneli
     </button>
-    <h2>Grupas Pieteikumu Pārvaldība</h2>
+    <h2 class="view-title">
+      <i class="fas fa-clipboard-check"></i> Grupu Pieteikumu Pārvaldība
+    </h2>
 
-    <div class="admin-filters">
-      <div class="form-group">
-        <label for="statusFilter">Filtrēt pēc statusa:</label>
-        <select
-          id="statusFilter"
-          v-model="statusFilter"
-          @change="fetchApplications"
-          :disabled="isLoading || isProcessing"
-        >
-          <option value="pending">Gaida Apstiprinājumu (Pending)</option>
-          <option value="approved">Apstiprinātie (Approved)</option>
-          <option value="rejected">Noraidītie (Rejected)</option>
-          <option value="">Visi</option>
-        </select>
+    <div class="filters-panel card-style-inner">
+      <h3 class="filters-title">
+        <i class="fas fa-filter"></i> Filtrēt Pieteikumus
+      </h3>
+      <div class="filters-grid">
+        <div class="form-group">
+          <label for="statusFilter">Statuss:</label>
+          <select
+            id="statusFilter"
+            v-model="statusFilter"
+            @change="fetchApplications"
+            :disabled="isLoading || isProcessing"
+          >
+            <option value="pending">Gaida Apstiprinājumu</option>
+            <option value="approved">Apstiprinātie</option>
+            <option value="rejected">Noraidītie</option>
+            <option value="">Visi Statusi</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="groupNameFilter">Grupas nosaukums:</label>
+          <input
+            type="text"
+            id="groupNameFilter"
+            v-model="groupNameFilter"
+            @input="debouncedFetchApplications"
+            placeholder="Meklēt grupu..."
+            :disabled="isLoading || isProcessing"
+          />
+        </div>
       </div>
-      <!-- Add group filter if needed later -->
     </div>
 
-    <div v-if="isLoading" class="loading-message">
-      <p>Notiek pieteikumu ielāde...</p>
+    <div v-if="isLoading" class="loading-indicator">
+      <i class="fas fa-spinner fa-spin"></i> Notiek pieteikumu ielāde...
     </div>
     <div v-else-if="errorMessage" class="error-message">
-      {{ errorMessage }}
+      <i class="fas fa-exclamation-triangle"></i> {{ errorMessage }}
     </div>
-    <div v-else-if="applications.length === 0" class="empty-list-message">
+    <div
+      v-else-if="applications.length === 0"
+      class="empty-list-message card-style-inner"
+    >
+      <i class="fas fa-folder-open fa-3x"></i>
       <p>Pēc izvēlētajiem kritērijiem nav atrasts neviens pieteikums.</p>
+      <p v-if="statusFilter !== 'pending' || groupNameFilter">
+        Mēģiniet mainīt filtru iestatījumus vai pārbaudīt "Gaida Apstiprinājumu"
+        statusu.
+      </p>
     </div>
+
     <div v-else class="applications-container">
       <div
         v-for="app in applications"
         :key="app._id"
-        class="list-item application-item"
+        class="list-item application-item card-style-inner"
+        :class="`status-border-${app.status}`"
       >
-        <div class="item-header">
-          <h3>Pieteikums grupai: {{ app.groupName || "Nezināma Grupa" }}</h3>
+        <div class="app-item-header">
+          <div class="app-icon" :class="`status-icon-${app.status}`">
+            <i :class="getIconForStatus(app.status)"></i>
+          </div>
+          <div class="app-header-info">
+            <h3>
+              Pieteikums grupai:
+              <span>{{ app.groupName || "Nezināma Grupa" }}</span>
+            </h3>
+            <p class="applicant-info">
+              <i class="fas fa-user"></i> {{ app.userFirstName }} ({{
+                app.userEmail
+              }})
+            </p>
+          </div>
         </div>
-        <div class="item-content">
-          <p>
-            <strong>Pieteicējs:</strong> {{ app.userFirstName }} ({{
-              app.userEmail
-            }})
+        <div class="app-item-content">
+          <p class="app-meta">
+            <i class="fas fa-calendar-plus"></i> Pieteikts:
+            <strong>{{ formatDate(app.appliedAt) }}</strong>
           </p>
-          <p>
-            <strong>Pieteikuma Datums:</strong> {{ formatDate(app.appliedAt) }}
-          </p>
-          <p>
-            <strong>Statuss:</strong>
-            <span :class="`status-${app.status}`">{{
+          <p class="app-meta">
+            <i class="fas fa-info-circle"></i> Statuss:
+            <span class="status-text" :class="`status-text-${app.status}`">{{
               getStatusText(app.status)
             }}</span>
           </p>
           <div v-if="app.message" class="application-message-display">
-            <strong>Pieteicēja ziņa:</strong>
+            <strong><i class="fas fa-comment-alt"></i> Pieteicēja ziņa:</strong>
             <p class="message-text">{{ app.message }}</p>
           </div>
+          <div v-if="app.processedAt" class="app-meta processed-info">
+            <i class="fas fa-user-check"></i> Apstrādāja:
+            {{ app.processedBy ? "Administrators" : "Neznāms" }} |
+            <i class="fas fa-clock"></i> {{ formatDate(app.processedAt) }}
+            <span v-if="app.reason">
+              | <i class="fas fa-info-circle"></i> Iemesls:
+              {{ app.reason }}</span
+            >
+          </div>
         </div>
-        <div class="item-actions" v-if="app.status === 'pending'">
+
+        <div class="app-item-actions" v-if="app.status === 'pending'">
           <button
-            class="action-button-small approve"
+            class="action-button success-button"
             @click="processApplication(app._id, 'approve')"
-            :disabled="isProcessing || processingId === app._id"
+            :disabled="isProcessing && processingId === app._id"
           >
+            <i class="fas fa-check-circle"></i>
             {{
               isProcessing &&
               processingId === app._id &&
@@ -81,10 +127,11 @@
             }}
           </button>
           <button
-            class="action-button-small reject"
+            class="action-button danger-button"
             @click="processApplication(app._id, 'reject')"
-            :disabled="isProcessing || processingId === app._id"
+            :disabled="isProcessing && processingId === app._id"
           >
+            <i class="fas fa-times-circle"></i>
             {{
               isProcessing &&
               processingId === app._id &&
@@ -102,6 +149,13 @@
               : 'error-message-inline'
           "
         >
+          <i
+            :class="
+              actionMessage[app._id].type === 'success'
+                ? 'fas fa-check-circle'
+                : 'fas fa-exclamation-circle'
+            "
+          ></i>
           {{ actionMessage[app._id].text }}
         </div>
       </div>
@@ -111,6 +165,7 @@
 
 <script>
 import axios from "axios";
+import _ from "lodash";
 
 export default {
   name: "ManageGroupApplicationsView",
@@ -123,8 +178,19 @@ export default {
       currentAction: "",
       errorMessage: "",
       actionMessage: {},
-      statusFilter: "pending", // Default to pending applications
+      statusFilter: "pending",
+      groupNameFilter: "", // New filter for group name
     };
+  },
+  created() {
+    this.fetchApplications();
+    this.debouncedFetchApplications = _.debounce(this.fetchApplications, 500);
+  },
+  watch: {
+    statusFilter() {
+      this.fetchApplications();
+    },
+    // groupNameFilter is handled by debouncedFetchApplications on input
   },
   methods: {
     goBackToAdminDashboard() {
@@ -133,13 +199,30 @@ export default {
     async fetchApplications() {
       this.isLoading = true;
       this.errorMessage = "";
+      // Keep action messages for items not being re-fetched or to clear them if filter changes significantly
+      // For simplicity, let's clear actionMessage on each fetch.
+      // More sophisticated handling could preserve messages for items still in view.
       this.actionMessage = {};
+
+      let params = {};
+      if (this.statusFilter) params.status = this.statusFilter;
+      // If backend supports group name filtering for applications:
+      if (this.groupNameFilter.trim())
+        params.groupName = this.groupNameFilter.trim();
+
       try {
-        let url = "/api/groups/applications";
-        if (this.statusFilter) {
-          url += `?status=${this.statusFilter}`;
-        }
-        const response = await axios.get(url);
+        // Update URL construction to include groupName if your backend supports it
+        // For now, assuming backend might not directly filter by groupName for applications list.
+        // If it does, modify the params. For now, only status is passed.
+        // let url = "/api/groups/applications";
+        // if (this.statusFilter) {
+        //   url += `?status=${this.statusFilter}`;
+        // }
+        // If backend doesn't filter by groupName on this endpoint, frontend filtering might be needed after fetch
+        // or a different endpoint. For simplicity, assuming current backend handles status.
+        const response = await axios.get("/api/groups/applications", {
+          params,
+        });
         this.applications = response.data;
       } catch (error) {
         console.error("Error fetching group applications:", error);
@@ -153,8 +236,8 @@ export default {
       if (!dateString) return "N/A";
       const options = {
         year: "numeric",
-        month: "long",
-        day: "numeric",
+        month: "2-digit", // Use 'long' for full month name if preferred
+        day: "2-digit",
         hour: "2-digit",
         minute: "2-digit",
       };
@@ -163,6 +246,14 @@ export default {
       } catch (e) {
         return dateString;
       }
+    },
+    getIconForStatus(statusKey) {
+      const map = {
+        pending: "fas fa-hourglass-half",
+        approved: "fas fa-check-circle",
+        rejected: "fas fa-times-circle",
+      };
+      return map[statusKey] || "fas fa-question-circle";
     },
     getStatusText(statusKey) {
       const map = {
@@ -186,12 +277,9 @@ export default {
           ...this.actionMessage,
           [applicationId]: { text: response.data.msg, type: "success" },
         };
-        // Re-fetch applications based on the current filter after processing
-        // This ensures the list is up-to-date, especially if the processed item
-        // no longer matches the filter (e.g., moving from pending to approved).
         setTimeout(() => {
           this.fetchApplications();
-        }, 1500); // Delay to allow user to see message
+        }, 1800);
       } catch (error) {
         console.error(
           `Error ${action}ing application ${applicationId}:`,
@@ -207,151 +295,245 @@ export default {
           [applicationId]: { text: errMsg, type: "error" },
         };
       } finally {
-        // Keep isProcessing for a bit if message is shown, then reset
         setTimeout(() => {
           this.isProcessing = false;
           this.processingId = null;
           this.currentAction = "";
-        }, 1500);
+        }, 1800);
       }
     },
-  },
-  created() {
-    this.fetchApplications();
   },
 };
 </script>
 
 <style scoped>
+/* .manage-group-applications-view inherits .card-style from global */
 .manage-group-applications-view {
-  max-width: 900px;
+  padding: 1.5rem;
 }
-.loading-message,
+.view-title {
+  color: var(--header-bg-color);
+  margin: 0 0 1.5rem 0;
+  font-size: 1.8rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
+.filters-panel {
+  /* Uses .card-style-inner */
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+}
+.filters-title {
+  font-size: 1.2rem;
+  color: var(--primary-color);
+  margin-top: 0;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.filters-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+.filters-grid .form-group {
+  margin-bottom: 0;
+}
+.filters-grid .form-group label {
+  font-size: 0.9em;
+  font-weight: 500;
+}
+.filters-grid .form-group select,
+.filters-grid .form-group input[type="text"] {
+  padding: 0.6rem;
+  font-size: 0.95em;
+}
+
 .empty-list-message {
+  /* Uses .card-style-inner */
   text-align: center;
-  padding: 20px;
-  color: #555;
+  padding: 2rem;
+  color: #6c757d;
 }
+.empty-list-message .fas {
+  display: block;
+  margin-bottom: 1rem;
+  color: var(--secondary-color);
+  opacity: 0.5;
+}
+.empty-list-message p {
+  font-size: 1.05rem;
+  margin-bottom: 0.5rem;
+}
+
 .applications-container {
-  margin-top: 20px;
+  margin-top: 1rem;
 }
 .list-item.application-item {
-  background-color: #fff;
-  border: 1px solid #e0e0e0;
-  border-radius: 6px;
-  margin-bottom: 15px;
-  padding: 15px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  /* Uses .card-style-inner */
+  margin-bottom: 1.5rem;
+  transition: box-shadow 0.2s ease;
+  border-left-width: 5px;
+  border-left-style: solid;
 }
-.item-header h3 {
-  margin: 0 0 10px 0;
-  color: #2c3e50;
-  font-size: 1.2em;
+.list-item.application-item:hover {
+  box-shadow: var(--shadow-md);
 }
-.item-content p {
-  margin: 5px 0;
-  font-size: 0.95em;
-  line-height: 1.5;
+
+.status-border-pending {
+  border-left-color: var(--warning-color);
 }
-.item-content strong {
-  color: #34495e;
+.status-border-approved {
+  border-left-color: var(--success-color);
 }
-.status-pending {
-  font-weight: bold;
-  color: #f0ad4e;
+.status-border-rejected {
+  border-left-color: var(--danger-color);
 }
-.status-approved {
-  font-weight: bold;
-  color: #5cb85c;
+
+.app-item-header {
+  display: flex;
+  align-items: center; /* Vertically align icon and text */
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px dashed var(--border-color);
 }
-.status-rejected {
-  font-weight: bold;
-  color: #d9534f;
+.app-icon {
+  font-size: 2rem; /* Larger status icon */
+  width: 40px; /* Fixed width for alignment */
+  text-align: center;
+}
+.status-icon-pending {
+  color: var(--warning-color);
+}
+.status-icon-approved {
+  color: var(--success-color);
+}
+.status-icon-rejected {
+  color: var(--danger-color);
+}
+
+.app-header-info h3 {
+  margin: 0 0 0.25rem 0;
+  color: var(--header-bg-color);
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+.app-header-info h3 span {
+  /* Group name */
+  color: var(--primary-color);
+  font-weight: 500;
+}
+.applicant-info {
+  font-size: 0.9rem;
+  color: #555;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.app-item-content .app-meta {
+  margin: 0.3rem 0;
+  font-size: 0.9rem;
+  color: #495057;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.app-item-content .app-meta strong {
+  font-weight: 500;
+}
+.app-item-content .app-meta .fas {
+  color: var(--secondary-color);
+  font-size: 0.9em;
+}
+
+.status-text {
+  font-weight: 600;
+  text-transform: capitalize;
+}
+.status-text-pending {
+  color: #856404; /* Dark yellow for text on light bg */
+}
+.status-text-approved {
+  color: #155724; /* Dark green */
+}
+.status-text-rejected {
+  color: #721c24; /* Dark red */
 }
 
 .application-message-display {
-  margin-top: 10px;
-  padding: 10px;
+  margin-top: 0.75rem;
+  padding: 0.75rem;
   background-color: #f8f9fa;
   border: 1px solid #e9ecef;
-  border-radius: 4px;
+  border-radius: var(--border-radius);
 }
 .application-message-display strong {
   display: block;
-  margin-bottom: 5px;
+  margin-bottom: 0.3rem;
   font-size: 0.9em;
-  color: #495057;
+  color: var(--text-color);
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
 }
 .message-text {
-  font-size: 0.9em;
+  font-size: 0.95em;
   color: #333;
-  white-space: pre-wrap; /* Respects newlines and spacing */
+  white-space: pre-wrap;
   word-wrap: break-word;
-  margin: 0; /* Overrides default p margin if message-text is a p tag */
+  margin: 0;
+  padding-left: 1.5rem; /* Indent message text */
 }
 
-.item-actions {
-  margin-top: 15px;
-  padding-top: 10px;
-  border-top: 1px solid #f0f0f0;
+.processed-info {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px dotted #e0e0e0;
+  font-size: 0.85rem;
+  color: #6c757d;
+}
+
+.app-item-actions {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-color);
   display: flex;
-  gap: 10px;
+  gap: 0.75rem;
   justify-content: flex-end;
+  flex-wrap: wrap;
 }
-.action-button-small {
-  padding: 8px 15px;
-  font-size: 0.9em;
-  border-radius: 4px;
-  cursor: pointer;
-  border: none;
-  color: white;
+/* Using global .action-button and color modifier classes */
+.action-button.success-button {
+  background-color: var(--success-color);
 }
-.action-button-small.approve {
-  background-color: #5cb85c;
+.action-button.success-button:hover:not([disabled]) {
+  background-color: #1e7e34;
 }
-.action-button-small.approve:hover:not([disabled]) {
-  background-color: #4cae4c;
+.action-button.danger-button {
+  background-color: var(--danger-color);
 }
-.action-button-small.reject {
-  background-color: #d9534f;
+.action-button.danger-button:hover:not([disabled]) {
+  background-color: #c82333;
 }
-.action-button-small.reject:hover:not([disabled]) {
-  background-color: #c9302c;
-}
-.action-button-small[disabled] {
-  background-color: #bdc3c7;
-  cursor: not-allowed;
-  opacity: 0.7;
-}
+
 .success-message-inline,
 .error-message-inline {
-  padding: 8px;
-  margin-top: 10px;
-  border-radius: 4px;
+  margin-top: 0.75rem;
   font-size: 0.9em;
-  text-align: center;
 }
-.success-message-inline {
-  background-color: #e6ffed;
-  color: #2ecc71;
-  border: 1px solid #2ecc71;
-}
-.error-message-inline {
-  background-color: #fdd;
-  color: #e74c3c;
-  border: 1px solid #e74c3c;
-}
-.admin-filters {
-  padding: 10px;
-  background-color: #f1f3f5;
-  border-radius: 5px;
-  margin-bottom: 20px;
-}
-.admin-filters .form-group {
-  margin-bottom: 0; /* Remove bottom margin if only one filter */
-}
-.admin-filters .form-group label {
-  font-weight: bold;
-  margin-right: 10px;
+.success-message-inline .fas,
+.error-message-inline .fas {
+  margin-right: 0.4rem;
 }
 </style>

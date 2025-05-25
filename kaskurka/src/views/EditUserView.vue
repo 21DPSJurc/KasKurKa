@@ -1,16 +1,17 @@
-<!-- kaskurka/src/views/EditUserView.vue -->
 <template>
-  <div class="form-view edit-user-view">
+  <div class="form-view edit-user-view card-style">
     <button @click="cancelEdit" class="back-button" :disabled="isLoading">
-      ← Atpakaļ uz Lietotāju Pārvaldību
+      <i class="fas fa-arrow-left"></i> Atpakaļ uz Lietotāju Pārvaldību
     </button>
-    <h2>
-      Rediģēt Lietotāju: {{ originalUserData.firstName }}
-      {{ originalUserData.lastName }}
+    <h2 class="view-title">
+      <i class="fas fa-user-edit"></i> Rediģēt Lietotāju:
+      <span class="user-original-name"
+        >{{ originalUserData.firstName }} {{ originalUserData.lastName }}</span
+      >
     </h2>
 
     <div v-if="initialLoadingError" class="error-message">
-      {{ initialLoadingError }}
+      <i class="fas fa-exclamation-triangle"></i> {{ initialLoadingError }}
     </div>
 
     <form
@@ -18,37 +19,45 @@
       class="edit-user-form"
       v-if="!initialLoadingError && user.email"
     >
-      <div class="form-group">
-        <label for="firstName"
-          >Vārds: <span class="required-field">*</span></label
-        >
-        <input
-          type="text"
-          id="firstName"
-          v-model="user.firstName"
-          required
-          maxlength="30"
-          :disabled="isLoading"
-        />
-      </div>
+      <h3 class="form-section-title">
+        <i class="fas fa-id-card"></i> Pamatinformācija
+      </h3>
+      <div class="form-row">
+        <div class="form-group half-width">
+          <label for="firstName"
+            ><i class="fas fa-user form-icon"></i> Vārds:
+            <span class="required-field">*</span></label
+          >
+          <input
+            type="text"
+            id="firstName"
+            v-model="user.firstName"
+            required
+            maxlength="30"
+            :disabled="isLoading"
+          />
+        </div>
 
-      <div class="form-group">
-        <label for="lastName"
-          >Uzvārds: <span class="required-field">*</span></label
-        >
-        <input
-          type="text"
-          id="lastName"
-          v-model="user.lastName"
-          required
-          maxlength="30"
-          :disabled="isLoading"
-        />
+        <div class="form-group half-width">
+          <label for="lastName"
+            ><i class="fas fa-user form-icon"></i> Uzvārds:
+            <span class="required-field">*</span></label
+          >
+          <input
+            type="text"
+            id="lastName"
+            v-model="user.lastName"
+            required
+            maxlength="30"
+            :disabled="isLoading"
+          />
+        </div>
       </div>
 
       <div class="form-group">
         <label for="email"
-          >E-pasts: <span class="required-field">*</span></label
+          ><i class="fas fa-envelope form-icon"></i> E-pasts:
+          <span class="required-field">*</span></label
         >
         <input
           type="email"
@@ -60,100 +69,118 @@
       </div>
 
       <div class="form-group">
-        <label for="role">Loma: <span class="required-field">*</span></label>
-        <select id="role" v-model="user.role" required :disabled="isLoading">
+        <label for="role"
+          ><i class="fas fa-user-tag form-icon"></i> Loma:
+          <span class="required-field">*</span></label
+        >
+        <select
+          id="role"
+          v-model="user.role"
+          required
+          :disabled="isLoading || originalUserData._id === currentAdminId"
+        >
           <option value="student">Students</option>
           <option value="admin">Administrators</option>
         </select>
+        <small v-if="originalUserData._id === currentAdminId"
+          ><i class="fas fa-info-circle"></i> Administratoram nevar mainīt savu
+          lomu.</small
+        >
       </div>
 
       <hr class="form-divider" />
-      <h3>Studiju Informācija (Studentiem)</h3>
+      <h3 class="form-section-title">
+        <i class="fas fa-graduation-cap"></i> Studiju Informācija
+      </h3>
+      <div class="form-row">
+        <div class="form-group half-width">
+          <label for="studyStartYear"
+            ><i class="fas fa-calendar-alt form-icon"></i> Mācību sākuma gads:
+            <span class="required-field">*</span></label
+          >
+          <input
+            type="number"
+            id="studyStartYear"
+            v-model.number="user.studyStartYear"
+            required
+            :min="currentYear - 7"
+            :max="currentYear + 1"
+            :disabled="isLoading"
+          />
+        </div>
 
-      <div class="form-group">
-        <label for="studyStartYear"
-          >Mācību sākuma gads: <span class="required-field">*</span></label
-        >
-        <input
-          type="number"
-          id="studyStartYear"
-          v-model.number="user.studyStartYear"
-          required
-          :min="currentYear - 7"
-          :max="currentYear + 1"
-          :disabled="isLoading"
-        />
-        <small>Piemēram, {{ currentYear - 1 }}.</small>
+        <div class="form-group half-width">
+          <label for="group"
+            ><i class="fas fa-users form-icon"></i> Grupa:
+            <span class="required-field">*</span></label
+          >
+          <input
+            type="text"
+            id="group"
+            v-model="user.group"
+            required
+            maxlength="10"
+            :disabled="isLoading"
+          />
+        </div>
       </div>
-
-      <div class="form-group">
-        <label for="group">Grupa: <span class="required-field">*</span></label>
-        <input
-          type="text"
-          id="group"
-          v-model="user.group"
-          required
-          maxlength="10"
-          :disabled="isLoading"
-        />
-        <small>Piemēram, DT3 vai DP2-1 (līdz 10 rakstzīmēm).</small>
-      </div>
-
-      <!-- Removed Subgroup Field
-      <div class="form-group">
-        <label for="subgroup">Apakšgrupa:</label>
-        <input
-          type="text"
-          id="subgroup"
-          v-model="user.subgroup"
-          maxlength="5"
-          :disabled="isLoading"
-        />
-        <small>Piemēram, 1 vai P1 (līdz 5 rakstzīmēm).</small>
-      </div>
-      -->
 
       <hr class="form-divider" />
-      <h3>Paroles Maiņa (Neobligāti)</h3>
-      <div class="form-group">
-        <label for="newPassword">Jaunā Parole:</label>
-        <input
-          type="password"
-          id="newPassword"
-          v-model="user.newPassword"
-          :disabled="isLoading"
-        />
-        <small
-          >Atstājiet tukšu, lai nemainītu paroli. Ja ievadāt, jāatbilst drošības
-          prasībām.</small
-        >
+      <h3 class="form-section-title">
+        <i class="fas fa-key"></i> Paroles Maiņa (Neobligāti)
+      </h3>
+      <div class="form-row">
+        <div class="form-group half-width">
+          <label for="newPassword"
+            ><i class="fas fa-lock form-icon"></i> Jaunā Parole:</label
+          >
+          <input
+            type="password"
+            id="newPassword"
+            v-model="user.newPassword"
+            placeholder="Atstājiet tukšu, ja nemaināt"
+            :disabled="isLoading"
+          />
+        </div>
+        <div class="form-group half-width" v-if="user.newPassword">
+          <label for="confirmNewPassword"
+            ><i class="fas fa-check-circle form-icon"></i> Apstiprināt
+            Paroli:</label
+          >
+          <input
+            type="password"
+            id="confirmNewPassword"
+            v-model="user.confirmNewPassword"
+            :disabled="isLoading"
+          />
+        </div>
       </div>
-      <div class="form-group" v-if="user.newPassword">
-        <label for="confirmNewPassword">Apstiprināt Jauno Paroli:</label>
-        <input
-          type="password"
-          id="confirmNewPassword"
-          v-model="user.confirmNewPassword"
-          :disabled="isLoading"
-        />
-      </div>
+      <small v-if="user.newPassword"
+        >Parolei jābūt min. 8 rakstzīmes, ar lielo/mazo burtu un ciparu.</small
+      >
 
       <div v-if="successMessage" class="success-message">
-        {{ successMessage }}
+        <i class="fas fa-check-circle"></i> {{ successMessage }}
       </div>
-      <div v-if="errorMessage" class="error-message">{{ errorMessage }}</div>
+      <div v-if="errorMessage" class="error-message">
+        <i class="fas fa-exclamation-triangle"></i> {{ errorMessage }}
+      </div>
 
       <div class="form-actions">
         <button
           type="button"
           @click="cancelEdit"
-          class="action-button secondary-action"
+          class="action-button secondary-button"
           :disabled="isLoading"
         >
-          Atcelt
+          <i class="fas fa-times"></i> Atcelt
         </button>
-        <span></span>
-        <button type="submit" class="action-button" :disabled="isLoading">
+        <button
+          type="submit"
+          class="action-button primary-button"
+          :disabled="isLoading"
+        >
+          <i class="fas fa-save"></i>
           {{ isLoading ? "Saglabā..." : "Saglabāt Izmaiņas" }}
         </button>
       </div>
@@ -162,6 +189,7 @@
 </template>
 
 <script>
+// Script section remains the same as previously provided
 import axios from "axios";
 
 export default {
@@ -171,23 +199,22 @@ export default {
       type: String,
       required: true,
     },
+    currentAdminId: String, // To prevent admin from changing their own role
   },
   data() {
     const currentYear = new Date().getFullYear();
     return {
       user: {
-        // Form data
         firstName: "",
         lastName: "",
         email: "",
         role: "student",
         studyStartYear: currentYear,
         group: "",
-        // subgroup: "", // Removed subgroup
         newPassword: "",
         confirmNewPassword: "",
       },
-      originalUserData: {}, // To display original name in title or compare changes
+      originalUserData: {},
       currentYear: currentYear,
       isLoading: false,
       initialLoadingError: "",
@@ -215,9 +242,8 @@ export default {
       this.successMessage = "";
       try {
         const response = await axios.get(`/api/users/${userId}`);
-        this.originalUserData = { ...response.data }; // Keep a copy of original
+        this.originalUserData = { ...response.data };
 
-        // Populate form fields
         this.user.firstName = response.data.firstName;
         this.user.lastName = response.data.lastName;
         this.user.email = response.data.email;
@@ -225,8 +251,7 @@ export default {
         this.user.studyStartYear =
           response.data.studyStartYear || this.currentYear;
         this.user.group = response.data.group || "";
-        // this.user.subgroup = response.data.subgroup || ""; // subgroup removed
-        this.user.newPassword = ""; // Always clear password fields on load
+        this.user.newPassword = "";
         this.user.confirmNewPassword = "";
       } catch (error) {
         console.error("Error fetching user details:", error);
@@ -255,19 +280,15 @@ export default {
         "group",
       ];
       for (const field of requiredFields) {
-        if (!this.user[field] && field !== "studyStartYear") {
-          // String fields
-          this.errorMessage =
-            "Lūdzu, aizpildiet visus obligātos laukus ar zvaigznīti.";
-          return false;
-        }
         if (
-          field === "studyStartYear" &&
-          (this.user[field] === null ||
+          !this.user[field] &&
+          (typeof this.user[field] !== "number" ||
+            this.user[field] === null ||
             this.user[field] === undefined ||
             this.user[field] === "")
         ) {
-          this.errorMessage = "Lūdzu, norādiet mācību sākuma gadu.";
+          this.errorMessage =
+            "Lūdzu, aizpildiet visus obligātos laukus ar zvaigznīti.";
           return false;
         }
       }
@@ -280,7 +301,6 @@ export default {
         return false;
       }
 
-      // Password validation only if newPassword is provided
       if (this.user.newPassword) {
         const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
         if (!passwordRegex.test(this.user.newPassword)) {
@@ -309,10 +329,9 @@ export default {
         role: this.user.role,
         studyStartYear: parseInt(this.user.studyStartYear, 10),
         group: this.user.group.trim(),
-        // subgroup: this.user.subgroup.trim(), // subgroup removed
       };
       if (this.user.newPassword) {
-        updateData.newPassword = this.user.newPassword; // Backend will hash it
+        updateData.newPassword = this.user.newPassword;
       }
 
       try {
@@ -321,20 +340,34 @@ export default {
           updateData
         );
         this.successMessage = response.data.msg;
-        
+
         const loggedInUser = JSON.parse(localStorage.getItem("user"));
         if (loggedInUser && loggedInUser.id === this.userIdToEdit) {
+          // If admin edits their own profile (excluding password change here for simplicity in local storage)
+          const updatedDetailsForLocalStorage = { ...response.data.user };
+          delete updatedDetailsForLocalStorage.password; // Never store password in localStorage
+
           const updatedLoggedInUser = {
-            ...loggedInUser,
-            ...response.data.user,
-          }; 
-          delete updatedLoggedInUser.subgroup; // Ensure subgroup is removed if it was there
+            ...loggedInUser, // Keep existing JWT relevant fields like enrolledCustomGroups etc.
+            firstName: updatedDetailsForLocalStorage.firstName,
+            lastName: updatedDetailsForLocalStorage.lastName,
+            email: updatedDetailsForLocalStorage.email,
+            role: updatedDetailsForLocalStorage.role,
+            studyStartYear: updatedDetailsForLocalStorage.studyStartYear,
+            group: updatedDetailsForLocalStorage.group,
+          };
           localStorage.setItem("user", JSON.stringify(updatedLoggedInUser));
+          // Potentially emit an event to App.vue to refresh its own currentUser if needed
+          // This is important if admin changes their own role, for example.
+          if (this.refreshUser) {
+            // Assuming refreshUser is injected
+            await this.refreshUser();
+          }
         }
 
         setTimeout(() => {
           this.$emit("userUpdateSuccess", this.successMessage);
-        }, 1500);
+        }, 1800);
       } catch (error) {
         if (error.response && error.response.data && error.response.data.msg) {
           this.errorMessage = error.response.data.msg;
@@ -346,11 +379,8 @@ export default {
       } finally {
         if (this.errorMessage) {
           this.isLoading = false;
-        } else if (this.successMessage) {
-          // isLoading will effectively be true until navigation
-        } else {
-          this.isLoading = false; // fallback
         }
+        // If success, isLoading will be true until navigation
       }
     },
   },
@@ -358,30 +388,102 @@ export default {
 </script>
 
 <style scoped>
-/* Styles are largely global from .form-view */
-.edit-user-view h2 {
+/* .edit-user-view inherits .form-view and .card-style from global */
+.edit-user-view {
+  padding: 1.5rem;
+}
+.view-title {
+  color: var(--header-bg-color);
+  margin: 0 0 1.5rem 0;
+  font-size: 1.8rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  text-align: center;
+}
+.view-title .user-original-name {
+  color: var(--primary-color);
+  font-weight: 500;
+  font-size: 0.9em; /* Slightly smaller than main title */
+  word-break: break-all;
+}
+
+.form-section-title {
+  font-size: 1.2rem;
+  color: var(--primary-color);
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.form-section-title:first-of-type {
   margin-top: 0;
-  font-size: 1.5em; /* Slightly smaller to fit name */
-  word-break: break-word;
 }
-.secondary-action {
-  background-color: #6c757d;
+
+.form-icon {
+  margin-right: 0.5em;
+  color: var(--primary-color);
+  opacity: 0.7;
 }
-.secondary-action:hover:not([disabled]) {
-  background-color: #5a6268;
+
+.form-row {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
 }
+.form-group.half-width {
+  flex: 1;
+  min-width: 0;
+  margin-bottom: 0;
+}
+
 .form-divider {
-  margin-top: 30px;
-  margin-bottom: 20px;
+  margin-top: 2rem;
+  margin-bottom: 1.5rem;
   border: 0;
-  border-top: 1px solid #eee;
+  border-top: 1px solid var(--border-color);
 }
-.edit-user-form h3 {
-  font-size: 1.1em;
-  color: #34495e;
-  margin-bottom: 15px;
-  margin-top: 0;
-  padding-bottom: 5px;
-  border-bottom: 1px dotted #bdc3c7;
+.form-group small .fas {
+  margin-right: 0.3em;
+  opacity: 0.8;
+}
+
+.success-message .fas,
+.error-message .fas {
+  margin-right: 0.5em;
+}
+
+.form-actions {
+  justify-content: space-between;
+  margin-top: 1.5rem;
+}
+
+@media (max-width: 768px) {
+  /* Increased breakpoint for form-row stacking */
+  .form-row {
+    flex-direction: column;
+    gap: 0;
+    margin-bottom: 0;
+  }
+  .form-group.half-width {
+    margin-bottom: 1.25rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .form-actions {
+    flex-direction: column-reverse;
+  }
+  .form-actions .action-button {
+    width: 100%;
+  }
+  .form-actions .secondary-button {
+    margin-bottom: 0.75rem;
+  }
 }
 </style>

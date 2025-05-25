@@ -1,64 +1,83 @@
 <template>
-  <div class="manage-groups-view form-view">
+  <div class="manage-groups-view card-style">
     <button
       @click="goBackToAdminDashboard"
       class="back-button"
       :disabled="isLoading || isProcessing"
     >
-      ← Atpakaļ uz Admin Paneli
+      <i class="fas fa-arrow-left"></i> Atpakaļ uz Admin Paneli
     </button>
-    <h2>Pārvaldīt Grupas</h2>
+    <h2 class="view-title"><i class="fas fa-cogs"></i> Pārvaldīt Grupas</h2>
 
-    <div v-if="isLoading" class="loading-message">
-      <p>Notiek grupu ielāde...</p>
+    <div v-if="isLoading" class="loading-indicator">
+      <i class="fas fa-spinner fa-spin"></i> Notiek grupu ielāde...
     </div>
     <div v-else-if="errorMessage" class="error-message">
-      {{ errorMessage }}
+      <i class="fas fa-exclamation-triangle"></i> {{ errorMessage }}
     </div>
-    <div v-else-if="groups.length === 0" class="empty-list-message">
+    <div
+      v-else-if="groups.length === 0"
+      class="empty-list-message card-style-inner"
+    >
+      <i class="fas fa-folder-open fa-3x"></i>
       <p>Pašlaik nav izveidotu grupu.</p>
-      <button class="action-button" @click="navigateToCreateGroup">
-        Izveidot Jaunu Grupu
+      <button
+        class="action-button primary-button"
+        @click="navigateToCreateGroupDirectly"
+      >
+        <i class="fas fa-plus-circle"></i> Izveidot Jaunu Grupu
       </button>
     </div>
-    <div v-else class="groups-container">
+
+    <div v-else class="groups-management-container">
       <div
         v-for="group in groups"
         :key="group._id"
-        class="list-item group-management-item"
+        class="list-item group-management-item card-style-inner"
       >
-        <div class="item-header">
-          <h3>{{ group.name }}</h3>
-          <p v-if="group.studyYear" class="group-study-year">
-            Mācību gads: {{ group.studyYear }}
-          </p>
+        <div class="group-item-header">
+          <i class="fas fa-layer-group group-icon"></i>
+          <div class="group-info">
+            <h3>{{ group.name }}</h3>
+            <p v-if="group.studyYear" class="group-study-year">
+              <i class="fas fa-calendar-alt"></i> {{ group.studyYear }}
+            </p>
+          </div>
         </div>
-        <div class="item-content">
+        <div class="group-item-content">
           <p v-if="group.description" class="group-description">
             {{ group.description }}
           </p>
           <p v-else class="group-description italic">Apraksts nav pieejams.</p>
-          <small
-            >Izveidota: {{ formatDate(group.createdAt) }} | Atjaunināta:
-            {{ formatDate(group.updatedAt) }}</small
-          >
-          <small v-if="group.members"
-            >Dalībnieku skaits: {{ group.members.length }}</small
-          >
+          <div class="group-meta-container">
+            <small class="group-meta"
+              ><i class="fas fa-clock"></i> Izveidota:
+              {{ formatDate(group.createdAt) }}</small
+            >
+            <small class="group-meta"
+              ><i class="fas fa-sync-alt"></i> Atjaunināta:
+              {{ formatDate(group.updatedAt) }}</small
+            >
+            <small class="group-meta"
+              ><i class="fas fa-user-friends"></i> Dalībnieki:
+              {{ group.members ? group.members.length : 0 }}</small
+            >
+          </div>
         </div>
-        <div class="item-actions">
+        <div class="group-item-actions">
           <button
-            class="action-button-small edit"
+            class="action-button warning-button"
             @click="editGroup(group._id)"
             :disabled="isProcessing && processingGroupId === group._id"
           >
-            Rediģēt
+            <i class="fas fa-edit"></i> Rediģēt / Pārvaldīt Dalībniekus
           </button>
           <button
-            class="action-button-small delete"
+            class="action-button danger-button"
             @click="confirmDeleteGroup(group)"
             :disabled="isProcessing && processingGroupId === group._id"
           >
+            <i class="fas fa-trash-alt"></i>
             {{
               isProcessing && processingGroupId === group._id
                 ? "Dzēš..."
@@ -74,6 +93,13 @@
               : 'error-message-inline'
           "
         >
+          <i
+            :class="
+              actionMessage[group._id].type === 'success'
+                ? 'fas fa-check-circle'
+                : 'fas fa-exclamation-circle'
+            "
+          ></i>
           {{ actionMessage[group._id].text }}
         </div>
       </div>
@@ -90,31 +116,26 @@ export default {
     return {
       groups: [],
       isLoading: true,
-      isProcessing: false, // For delete operation
-      processingGroupId: null, // ID of group being deleted
+      isProcessing: false,
+      processingGroupId: null,
       errorMessage: "",
-      actionMessage: {}, // To show success/error per group item: { groupId: { text: '', type: 'success/error' } }
+      actionMessage: {},
     };
   },
   methods: {
     goBackToAdminDashboard() {
       this.$emit("navigateToAdminDashboard");
     },
-    navigateToCreateGroup() {
-      // This component doesn't directly navigate to create group, App.vue handles it
-      // But if we want a button here, AdminDashboardView would be the place to emit.
-      // For now, this could be a placeholder or we can emit to App.vue to switch view.
-      // Let's assume AdminDashboard still has the primary create button.
-      // This button is for when the list is empty.
-      this.$emit("navigateToAdminDashboard"); // Or emit navigateToCreateGroup if App.vue has such handler.
-      // For now, going back to admin dash where create button is.
+    navigateToCreateGroupDirectly() {
+      // This emits an event that App.vue should handle to switch to CreateGroupView
+      this.$emit("navigateToCreateGroup");
     },
     async fetchGroups() {
       this.isLoading = true;
       this.errorMessage = "";
       this.actionMessage = {};
       try {
-        const response = await axios.get("/api/groups"); // Uses the general GET /api/groups
+        const response = await axios.get("/api/groups");
         this.groups = response.data.sort((a, b) =>
           a.name.localeCompare(b.name)
         );
@@ -160,10 +181,9 @@ export default {
             ...this.actionMessage,
             [group._id]: { text: response.data.msg, type: "success" },
           };
-          // Refresh list after a short delay to show message
           setTimeout(() => {
             this.fetchGroups();
-          }, 1500);
+          }, 1800); // Slightly longer to read message
         } catch (error) {
           console.error(`Error deleting group ${group._id}:`, error);
           const errMsg = error.response?.data?.msg || "Kļūda dzēšot grupu.";
@@ -172,11 +192,10 @@ export default {
             [group._id]: { text: errMsg, type: "error" },
           };
         } finally {
-          // Keep isProcessing true for a bit if message is shown, then reset
           setTimeout(() => {
             this.isProcessing = false;
             this.processingGroupId = null;
-          }, 1500);
+          }, 1800);
         }
       }
     },
@@ -188,104 +207,144 @@ export default {
 </script>
 
 <style scoped>
+/* .manage-groups-view inherits .card-style from global */
 .manage-groups-view {
-  max-width: 900px;
+  padding: 1.5rem;
 }
-.loading-message,
+.view-title {
+  color: var(--header-bg-color);
+  margin: 0 0 1.5rem 0;
+  font-size: 1.8rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
 .empty-list-message {
+  /* Uses .card-style-inner */
   text-align: center;
-  padding: 20px;
-  color: #555;
+  padding: 2rem;
+  color: #6c757d;
+}
+.empty-list-message .fas {
+  display: block;
+  margin-bottom: 1rem;
+  color: var(--secondary-color);
+  opacity: 0.5;
+}
+.empty-list-message p {
+  font-size: 1.05rem;
+  margin-bottom: 1rem;
 }
 .empty-list-message .action-button {
-  margin-top: 15px;
+  margin-top: 0.5rem;
 }
-.groups-container {
-  margin-top: 20px;
+
+.groups-management-container {
+  margin-top: 1rem;
 }
 .list-item.group-management-item {
-  /* More specific class name */
-  background-color: #fff;
-  border: 1px solid #e0e0e0;
-  border-radius: 6px;
-  margin-bottom: 15px;
-  padding: 15px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  /* Uses .card-style-inner */
+  margin-bottom: 1.5rem;
+  transition: box-shadow 0.2s ease;
+  border-left: 5px solid var(--primary-color);
 }
-.item-header h3 {
-  margin: 0 0 5px 0;
-  color: #2c3e50;
-  font-size: 1.3em;
+.list-item.group-management-item:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.group-item-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px dashed var(--border-color);
+}
+.group-icon {
+  font-size: 1.8rem;
+  color: var(--primary-color);
+  opacity: 0.8;
+}
+.group-info h3 {
+  margin: 0 0 0.2rem 0;
+  color: var(--header-bg-color);
+  font-size: 1.3rem;
+  font-weight: 600;
 }
 .group-study-year {
-  font-size: 0.9em;
-  color: #7f8c8d;
-  margin-bottom: 10px;
-}
-.group-description {
-  font-size: 0.95em;
-  color: #333;
-  margin-bottom: 10px;
-}
-.group-description.italic {
-  font-style: italic;
-  color: #777;
-}
-.item-content small {
-  display: block;
-  font-size: 0.85em;
-  color: #7f8c8d;
-  margin-top: 5px;
-}
-.item-actions {
-  margin-top: 15px;
-  padding-top: 10px;
-  border-top: 1px solid #f0f0f0;
+  font-size: 0.85rem;
+  color: #6c757d;
+  margin: 0;
   display: flex;
-  gap: 10px;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.group-item-content .group-description {
+  font-size: 0.95em;
+  color: #495057;
+  margin-bottom: 0.75rem;
+  line-height: 1.6;
+}
+.group-item-content .group-description.italic {
+  font-style: italic;
+  color: #6c757d;
+}
+
+.group-meta-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem; /* Spacing between meta items */
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px dotted #e9ecef;
+}
+.group-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: #7f8c8d;
+  background-color: #f8f9fa;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--border-radius);
+}
+
+.group-item-actions {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  gap: 0.75rem;
   justify-content: flex-end;
+  flex-wrap: wrap;
 }
-.action-button-small {
-  padding: 8px 15px;
-  font-size: 0.9em;
-  border-radius: 4px;
-  cursor: pointer;
-  border: none;
-  color: white;
+/* Using global .action-button and color modifier classes */
+.action-button.warning-button {
+  background-color: var(--warning-color);
+  color: var(--text-color);
 }
-.action-button-small.edit {
-  background-color: #f0ad4e;
+.action-button.warning-button:hover:not([disabled]) {
+  background-color: #e0a800;
 }
-.action-button-small.edit:hover:not([disabled]) {
-  background-color: #ec971f;
+.action-button.danger-button {
+  background-color: var(--danger-color);
 }
-.action-button-small.delete {
-  background-color: #d9534f;
+.action-button.danger-button:hover:not([disabled]) {
+  background-color: #c82333;
 }
-.action-button-small.delete:hover:not([disabled]) {
-  background-color: #c9302c;
-}
-.action-button-small[disabled] {
-  background-color: #bdc3c7;
-  cursor: not-allowed;
-  opacity: 0.7;
-}
+
 .success-message-inline,
 .error-message-inline {
-  padding: 8px;
-  margin-top: 10px;
-  border-radius: 4px;
+  /* Global styles already cover these, but you can add specifics if needed */
+  margin-top: 0.75rem;
   font-size: 0.9em;
-  text-align: center;
 }
-.success-message-inline {
-  background-color: #e6ffed;
-  color: #2ecc71;
-  border: 1px solid #2ecc71;
-}
-.error-message-inline {
-  background-color: #fdd;
-  color: #e74c3c;
-  border: 1px solid #e74c3c;
+.success-message-inline .fas,
+.error-message-inline .fas {
+  margin-right: 0.4rem;
 }
 </style>

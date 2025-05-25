@@ -1,57 +1,118 @@
 <template>
-  <div class="manage-users-view form-view">
+  <div class="manage-users-view card-style">
     <button
       @click="goBackToAdminDashboard"
       class="back-button"
       :disabled="isLoading || isProcessing"
     >
-      ← Atpakaļ uz Admin Paneli
+      <i class="fas fa-arrow-left"></i> Atpakaļ uz Admin Paneli
     </button>
-    <h2>Pārvaldīt Lietotājus</h2>
+    <h2 class="view-title">
+      <i class="fas fa-users-cog"></i> Pārvaldīt Lietotājus
+    </h2>
 
-    <div v-if="isLoading" class="loading-message">
-      <p>Notiek lietotāju ielāde...</p>
+    <div class="filters-panel card-style-inner">
+      <h3 class="filters-title">
+        <i class="fas fa-filter"></i> Filtrēt Lietotājus
+      </h3>
+      <div class="filters-grid">
+        <div class="form-group">
+          <label for="userSearch">Meklēt (Vārds, Uzvārds, E-pasts):</label>
+          <input
+            type="text"
+            id="userSearch"
+            :value="userSearchQuery"
+            @input="handleUserSearchInput"
+            placeholder="Ievadiet meklējamo..."
+            :disabled="isLoading || isProcessing"
+          />
+        </div>
+        <div class="form-group">
+          <label for="roleFilter">Loma:</label>
+          <select
+            id="roleFilter"
+            v-model="roleFilter"
+            :disabled="isLoading || isProcessing"
+          >
+            <option value="">Visas Lomas</option>
+            <option value="student">Students</option>
+            <option value="admin">Administrators</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="isLoading" class="loading-indicator">
+      <i class="fas fa-spinner fa-spin"></i> Notiek lietotāju ielāde...
     </div>
     <div v-else-if="errorMessage" class="error-message">
-      {{ errorMessage }}
+      <i class="fas fa-exclamation-triangle"></i> {{ errorMessage }}
     </div>
-    <div v-else-if="users.length === 0" class="empty-list-message">
-      <p>Pašlaik nav reģistrētu lietotāju (izņemot, iespējams, jūs).</p>
+    <div
+      v-else-if="filteredUsers.length === 0"
+      class="empty-list-message card-style-inner"
+    >
+      <i class="fas fa-user-slash fa-3x"></i>
+      <p>Pēc jūsu izvēlētajiem kritērijiem netika atrasts neviens lietotājs.</p>
+      <p v-if="userSearchQuery || roleFilter">
+        Mēģiniet mainīt filtru iestatījumus.
+      </p>
     </div>
-    <div v-else class="users-container">
+
+    <div v-else class="users-management-container">
       <div
-        v-for="user in users"
+        v-for="user in filteredUsers"
         :key="user._id"
-        class="list-item user-management-item"
+        class="list-item user-management-item card-style-inner"
+        :class="`role-border-${user.role}`"
       >
-        <div class="item-header">
-          <h3>
-            {{ user.firstName }} {{ user.lastName }}
-            <span class="user-role-badge">{{ getRoleText(user.role) }}</span>
-          </h3>
+        <div class="user-item-header">
+          <div class="user-avatar-role">
+            <i class="fas fa-user-circle user-avatar"></i>
+            <span class="user-role-badge" :class="`role-bg-${user.role}`">{{
+              getRoleText(user.role)
+            }}</span>
+          </div>
+          <div class="user-header-info">
+            <h3>{{ user.firstName }} {{ user.lastName }}</h3>
+            <p class="user-email">
+              <i class="fas fa-envelope"></i> {{ user.email }}
+            </p>
+          </div>
         </div>
-        <div class="item-content">
-          <p><strong>E-pasts:</strong> {{ user.email }}</p>
-          <p>
-            <strong>Studiju grupa:</strong> {{ user.group
-            }}{{ user.subgroup ? "-" + user.subgroup : "" }} (sāk.
-            {{ user.studyStartYear }})
+        <div class="user-item-content">
+          <p class="user-detail">
+            <i class="fas fa-users"></i> <strong>Stud. grupa:</strong>
+            {{ user.group || "N/A" }}
           </p>
-          <small>Reģistrējies: {{ formatDate(user.createdAt) }}</small>
-          <small v-if="user.updatedAt && user.updatedAt !== user.createdAt"
-            >Atjaunināts: {{ formatDate(user.updatedAt) }}</small
-          >
+          <p class="user-detail">
+            <i class="fas fa-calendar-alt"></i> <strong>Sāk. gads:</strong>
+            {{ user.studyStartYear || "N/A" }}
+          </p>
+          <div class="user-meta-container">
+            <small class="user-meta"
+              ><i class="fas fa-clock"></i> Reģ.:
+              {{ formatDate(user.createdAt) }}</small
+            >
+            <small
+              class="user-meta"
+              v-if="user.updatedAt && user.updatedAt !== user.createdAt"
+            >
+              <i class="fas fa-sync-alt"></i> Atj.:
+              {{ formatDate(user.updatedAt) }}
+            </small>
+          </div>
         </div>
-        <div class="item-actions">
+        <div class="user-item-actions">
           <button
-            class="action-button-small edit"
+            class="action-button warning-button"
             @click="editUser(user._id)"
             :disabled="isProcessing && processingUserId === user._id"
           >
-            Rediģēt
+            <i class="fas fa-user-edit"></i> Rediģēt
           </button>
           <button
-            class="action-button-small delete"
+            class="action-button danger-button"
             @click="confirmDeleteUser(user)"
             :disabled="
               (isProcessing && processingUserId === user._id) ||
@@ -63,6 +124,7 @@
                 : 'Dzēst lietotāju'
             "
           >
+            <i class="fas fa-user-times"></i>
             {{
               isProcessing && processingUserId === user._id
                 ? "Dzēš..."
@@ -78,6 +140,13 @@
               : 'error-message-inline'
           "
         >
+          <i
+            :class="
+              actionMessage[user._id].type === 'success'
+                ? 'fas fa-check-circle'
+                : 'fas fa-exclamation-circle'
+            "
+          ></i>
           {{ actionMessage[user._id].text }}
         </div>
       </div>
@@ -87,11 +156,12 @@
 
 <script>
 import axios from "axios";
+import _ from "lodash"; // Import Lodash
 
 export default {
   name: "ManageUsersView",
   props: {
-    currentAdminId: String, // To prevent admin from deleting themselves
+    currentAdminId: String,
   },
   data() {
     return {
@@ -101,9 +171,53 @@ export default {
       processingUserId: null,
       errorMessage: "",
       actionMessage: {},
+      userSearchQuery: "",
+      roleFilter: "",
+      debouncedUserSearchHandler: null,
     };
   },
+  computed: {
+    filteredUsers() {
+      let tempUsers = [...this.users];
+
+      const searchQuery = this.userSearchQuery.trim().toLowerCase();
+      if (searchQuery) {
+        tempUsers = tempUsers.filter(
+          (user) =>
+            user.firstName.toLowerCase().includes(searchQuery) ||
+            user.lastName.toLowerCase().includes(searchQuery) ||
+            user.email.toLowerCase().includes(searchQuery)
+        );
+      }
+
+      if (this.roleFilter) {
+        tempUsers = tempUsers.filter((user) => user.role === this.roleFilter);
+      }
+      return tempUsers.sort(
+        (a, b) =>
+          a.lastName.localeCompare(b.lastName) ||
+          a.firstName.localeCompare(b.firstName)
+      );
+    },
+  },
+  created() {
+    this.fetchUsers();
+    this.debouncedUserSearchHandler = _.debounce((event) => {
+      this.userSearchQuery = event.target.value;
+    }, 500);
+  },
+  beforeUnmount() {
+    if (
+      this.debouncedUserSearchHandler &&
+      this.debouncedUserSearchHandler.cancel
+    ) {
+      this.debouncedUserSearchHandler.cancel();
+    }
+  },
   methods: {
+    handleUserSearchInput(event) {
+      this.debouncedUserSearchHandler(event);
+    },
     goBackToAdminDashboard() {
       this.$emit("navigateToAdminDashboard");
     },
@@ -128,8 +242,6 @@ export default {
         year: "numeric",
         month: "2-digit",
         day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
       };
       try {
         return new Date(dateString).toLocaleDateString("lv-LV", options);
@@ -139,7 +251,7 @@ export default {
     },
     getRoleText(roleKey) {
       const map = { student: "Students", admin: "Administrators" };
-      return map[roleKey] || roleKey;
+      return map[roleKey] || roleKey.charAt(0).toUpperCase() + roleKey.slice(1);
     },
     editUser(userId) {
       this.$emit("navigateToEditUser", userId);
@@ -151,7 +263,7 @@ export default {
       }
       if (
         confirm(
-          `Vai tiešām vēlaties dzēst lietotāju "${user.firstName} ${user.lastName}" (${user.email})? Šī darbība ir neatgriezeniska un var ietekmēt ar lietotāju saistītos datus (piem., komentārus).`
+          `Vai tiešām vēlaties dzēst lietotāju "${user.firstName} ${user.lastName}" (${user.email})? Šī darbība ir neatgriezeniska un var ietekmēt ar lietotāju saistītos datus (piem., komentārus, pieteikumus).`
         )
       ) {
         this.isProcessing = true;
@@ -165,8 +277,8 @@ export default {
             [user._id]: { text: response.data.msg, type: "success" },
           };
           setTimeout(() => {
-            this.fetchUsers();
-          }, 1500);
+            this.users = this.users.filter((u) => u._id !== user._id);
+          }, 1800);
         } catch (error) {
           console.error(`Error deleting user ${user._id}:`, error);
           const errMsg = error.response?.data?.msg || "Kļūda dzēšot lietotāju.";
@@ -178,124 +290,235 @@ export default {
           setTimeout(() => {
             this.isProcessing = false;
             this.processingUserId = null;
-          }, 1500);
+            if (
+              this.actionMessage[user._id] &&
+              this.actionMessage[user._id].type === "error"
+            ) {
+              setTimeout(() => {
+                this.actionMessage = {
+                  ...this.actionMessage,
+                  [user._id]: null,
+                };
+              }, 3000);
+            } else if (
+              this.actionMessage[user._id] &&
+              this.actionMessage[user._id].type === "success"
+            ) {
+              this.users = this.users.filter((u) => u._id !== user._id);
+            }
+          }, 1800);
         }
       }
     },
-  },
-  created() {
-    this.fetchUsers();
   },
 };
 </script>
 
 <style scoped>
+/* .manage-users-view inherits .card-style from global */
 .manage-users-view {
-  max-width: 900px;
+  padding: 1.5rem;
 }
-.loading-message,
-.empty-list-message {
-  text-align: center;
-  padding: 20px;
-  color: #555;
-}
-.users-container {
-  margin-top: 20px;
-}
-.list-item.user-management-item {
-  background-color: #fff;
-  border: 1px solid #e0e0e0;
-  border-radius: 6px;
-  margin-bottom: 15px;
-  padding: 15px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-}
-.item-header h3 {
-  margin: 0 0 5px 0;
-  color: #2c3e50;
-  font-size: 1.3em;
+.view-title {
+  color: var(--header-bg-color);
+  margin: 0 0 1.5rem 0;
+  font-size: 1.8rem;
+  font-weight: 600;
   display: flex;
-  justify-content: space-between;
   align-items: center;
-}
-.user-role-badge {
-  font-size: 0.7em;
-  padding: 4px 10px;
-  border-radius: 12px;
-  color: white;
-  font-weight: bold;
-  text-transform: uppercase;
-}
-.user-role-badge.student {
-  background-color: #3498db;
-}
-.user-role-badge.admin {
-  background-color: #e67e22;
+  justify-content: center;
+  gap: 0.75rem;
 }
 
-.item-content p {
-  margin: 5px 0;
-  font-size: 0.95em;
-  line-height: 1.5;
+.filters-panel {
+  /* Uses .card-style-inner */
+  margin-bottom: 1.5rem;
+  padding: 1rem;
 }
-.item-content strong {
-  color: #34495e;
-}
-.item-content small {
-  display: block;
-  font-size: 0.85em;
-  color: #7f8c8d;
-  margin-top: 5px;
-}
-.item-actions {
-  margin-top: 15px;
-  padding-top: 10px;
-  border-top: 1px solid #f0f0f0;
+.filters-title {
+  font-size: 1.2rem;
+  color: var(--primary-color);
+  margin-top: 0;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border-color);
   display: flex;
-  gap: 10px;
-  justify-content: flex-end;
+  align-items: center;
+  gap: 0.5rem;
 }
-.action-button-small {
-  padding: 8px 15px;
+.filters-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1rem;
+}
+.filters-grid .form-group {
+  margin-bottom: 0;
+}
+.filters-grid .form-group label {
   font-size: 0.9em;
-  border-radius: 4px;
-  cursor: pointer;
-  border: none;
-  color: white;
+  font-weight: 500;
 }
-.action-button-small.edit {
-  background-color: #f0ad4e;
+.filters-grid .form-group select,
+.filters-grid .form-group input[type="text"] {
+  padding: 0.6rem;
+  font-size: 0.95em;
 }
-.action-button-small.edit:hover:not([disabled]) {
-  background-color: #ec971f;
+
+.empty-list-message {
+  /* Uses .card-style-inner */
+  text-align: center;
+  padding: 2rem;
+  color: #6c757d;
 }
-.action-button-small.delete {
-  background-color: #d9534f;
+.empty-list-message .fas {
+  display: block;
+  margin-bottom: 1rem;
+  color: var(--secondary-color);
+  opacity: 0.5;
 }
-.action-button-small.delete:hover:not([disabled]) {
-  background-color: #c9302c;
+.empty-list-message p {
+  font-size: 1.05rem;
+  margin-bottom: 0.5rem;
 }
-.action-button-small[disabled] {
-  background-color: #bdc3c7;
-  cursor: not-allowed;
-  opacity: 0.7;
+
+.users-management-container {
+  margin-top: 1rem;
 }
-.success-message-inline,
-.error-message-inline {
-  padding: 8px;
-  margin-top: 10px;
-  border-radius: 4px;
+.list-item.user-management-item {
+  /* Uses .card-style-inner */
+  margin-bottom: 1.5rem;
+  transition: box-shadow 0.2s ease;
+  border-left-width: 5px;
+  border-left-style: solid;
+}
+.list-item.user-management-item:hover {
+  box-shadow: var(--shadow-md);
+}
+.role-border-student {
+  border-left-color: var(--info-color);
+}
+.role-border-admin {
+  border-left-color: var(--warning-color);
+}
+
+.user-item-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px dashed var(--border-color);
+}
+.user-avatar-role {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+}
+.user-avatar {
+  font-size: 2.5rem;
+  color: var(--secondary-color);
+  opacity: 0.8;
+}
+.user-role-badge {
+  font-size: 0.7rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 8px;
+  color: var(--text-color-light);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.role-bg-student {
+  background-color: var(--info-color);
+}
+.role-bg-admin {
+  background-color: var(--warning-color);
+  color: var(--text-color);
+}
+
+.user-header-info h3 {
+  margin: 0 0 0.25rem 0;
+  color: var(--header-bg-color);
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+.user-email {
+  font-size: 0.9rem;
+  color: #555;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.user-item-content .user-detail {
+  margin: 0.3rem 0;
+  font-size: 0.9rem;
+  color: #495057;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.user-item-content .user-detail .fas {
+  color: var(--secondary-color);
   font-size: 0.9em;
+  width: 16px;
   text-align: center;
 }
-.success-message-inline {
-  background-color: #e6ffed;
-  color: #2ecc71;
-  border: 1px solid #2ecc71;
+.user-item-content .user-detail strong {
+  font-weight: 500;
+  color: var(--text-color);
 }
+
+.user-meta-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+  padding-top: 0.5rem;
+  border-top: 1px dotted #e9ecef;
+}
+.user-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: #7f8c8d;
+}
+
+.user-item-actions {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.action-button.warning-button {
+  background-color: var(--warning-color);
+  color: var(--text-color);
+}
+.action-button.warning-button:hover:not([disabled]) {
+  background-color: #e0a800;
+}
+.action-button.danger-button {
+  background-color: var(--danger-color);
+  color: var(--text-color-light);
+}
+.action-button.danger-button:hover:not([disabled]) {
+  background-color: #c82333;
+}
+
+.success-message-inline,
 .error-message-inline {
-  background-color: #fdd;
-  color: #e74c3c;
-  border: 1px solid #e74c3c;
+  margin-top: 0.75rem;
+  font-size: 0.9em;
+}
+.success-message-inline .fas,
+.error-message-inline .fas {
+  margin-right: 0.4rem;
 }
 </style>

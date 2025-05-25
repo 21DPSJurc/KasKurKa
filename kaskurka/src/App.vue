@@ -2,129 +2,99 @@
   <div id="app-container">
     <header
       class="app-header"
-      v-if="!currentUser || !isDashboardRelatedView(currentView)"
+      :class="{
+        'dashboard-header-active':
+          isDashboardRelatedView(currentView) && currentUser,
+      }"
     >
-      <h1>KasKurKa</h1>
-      <div class="header-user-info">
-        <router-link
-          v-if="currentUser && !isMyProfileView(currentView)"
-          to="#"
-          @click.prevent="navigateToMyProfile"
-          class="profile-link"
-          >Mans Profils</router-link
-        >
-        <router-link
-          v-if="
-            currentUser &&
-            currentUser.role === 'admin' &&
-            !isAdminSpecificView(currentView) &&
-            !isMyProfileView(currentView)
-          "
-          to="#"
-          @click.prevent="navigateToAdminDashboard"
-          class="admin-panel-link"
-          >Admin Panelis</router-link
-        >
-        <div v-if="currentUser" class="user-greeting">
-          Sveiki, {{ currentUser.firstName }}!
-          <span
-            v-if="
-              currentUser.role === 'student' &&
-              currentUser.enrolledCustomGroupsDetails &&
-              currentUser.enrolledCustomGroupsDetails.length > 0
-            "
-          >
-            (Grupas:
-            {{
-              currentUser.enrolledCustomGroupsDetails
-                .map((g) => g.name)
-                .join(", ")
-            }})
-          </span>
-          <span v-else-if="currentUser.role === 'student'">
-            ({{ currentUser.group }})
-            <!-- Student, but no custom groups -->
-          </span>
-          <span v-else>
-            ({{ currentUser.group }})
-            <!-- Admin or other roles, display registration group -->
-          </span>
+      <div class="header-content">
+        <div class="logo-title-container">
+          <i class="fas fa-tasks logo-icon"></i>
+          <h1>KasKurKa</h1>
         </div>
-      </div>
-    </header>
-    <header
-      class="app-header dashboard-app-header"
-      v-else-if="currentUser && isDashboardRelatedView(currentView)"
-    >
-      <h1>KasKurKa</h1>
-      <div class="header-user-info">
-        <router-link
-          v-if="currentUser && !isMyProfileView(currentView)"
-          to="#"
-          @click.prevent="navigateToMyProfile"
-          class="profile-link"
-          >Mans Profils</router-link
-        >
-        <router-link
-          v-if="
-            currentUser &&
-            currentUser.role === 'admin' &&
-            !isAdminSpecificView(currentView) &&
-            !isMyProfileView(currentView)
-          "
-          to="#"
-          @click.prevent="navigateToAdminDashboard"
-          class="admin-panel-link"
-          >Admin Panelis</router-link
-        >
-        <div v-if="currentUser" class="user-greeting">
-          Sveiki, {{ currentUser.firstName }}!
-          <span
-            v-if="
-              currentUser.role === 'student' &&
-              currentUser.enrolledCustomGroupsDetails &&
-              currentUser.enrolledCustomGroupsDetails.length > 0
-            "
+        <div class="header-user-info">
+          <router-link
+            v-if="currentUser && !isMyProfileView(currentView)"
+            to="#"
+            @click.prevent="navigateToMyProfile"
+            class="header-link profile-link"
           >
-            (Grupas:
-            {{
-              currentUser.enrolledCustomGroupsDetails
-                .map((g) => g.name)
-                .join(", ")
-            }})
-          </span>
-          <span v-else-if="currentUser.role === 'student'">
-            ({{ currentUser.group }})
-            <!-- Student, but no custom groups -->
-          </span>
-          <span v-else>
-            ({{ currentUser.group }})
-            <!-- Admin or other roles, display registration group -->
-          </span>
+            <i class="fas fa-user-circle"></i> Mans Profils
+          </router-link>
+          <router-link
+            v-if="
+              currentUser &&
+              currentUser.role === 'admin' &&
+              !isAdminSpecificView(currentView) &&
+              !isMyProfileView(currentView)
+            "
+            to="#"
+            @click.prevent="navigateToAdminDashboard"
+            class="header-link admin-panel-link"
+          >
+            <i class="fas fa-shield-alt"></i> Admin Panelis
+          </router-link>
+          <div v-if="currentUser" class="user-greeting">
+            <i class="fas fa-hand-sparkles"></i> Sveiki,
+            {{ currentUser.firstName }}!
+            <span
+              v-if="
+                currentUser.role === 'student' &&
+                currentUser.enrolledCustomGroupsDetails &&
+                currentUser.enrolledCustomGroupsDetails.length > 0
+              "
+              class="user-group-display"
+            >
+              (Grupas:
+              {{
+                currentUser.enrolledCustomGroupsDetails
+                  .map((g) => g.name)
+                  .join(", ")
+              }})
+            </span>
+            <span
+              v-else-if="currentUser.role === 'student'"
+              class="user-group-display"
+            >
+              ({{ currentUser.group }})
+            </span>
+            <span v-else class="user-group-display">
+              ({{ currentUser.group }})
+            </span>
+          </div>
         </div>
       </div>
     </header>
 
     <main class="app-main">
       <template v-if="currentView === 'home' && !currentUser">
-        <section class="intro-section">
-          <p>
-            Esiet sveicināti "KasKurKa" - sistēmā, kas palīdzēs jums un jūsu
-            kursabiedriem sekot līdzi mājasdarbiem un pārbaudes darbiem. Šī
-            platforma ir īpaši noderīga, ja informācija par uzdevumiem tiek dota
-            mutiski vai ir izkaisīta dažādās vietās. Pievienojiet jaunus
-            ierakstus, dalieties ar informāciju un pārliecinieties, ka nekas
-            svarīgs nav palaists garām!
-          </p>
-        </section>
-        <nav class="actions-nav">
-          <button class="action-button" @click="navigateToLogin">
-            Pieslēgties
-          </button>
-          <button class="action-button" @click="navigateToRegister">
-            Reģistrēties
-          </button>
-        </nav>
+        <div class="home-container">
+          <section class="intro-section card-style">
+            <h2 class="intro-title">Esiet Sveicināti KasKurKa!</h2>
+            <p>
+              Jūsu jaunais palīgs mācību dzīvē! Sekojiet līdzi mājasdarbiem,
+              pārbaudes darbiem un kursa aktualitātēm vienuviet. Platforma ir
+              īpaši noderīga, ja informācija par uzdevumiem tiek dota mutiski
+              vai ir izkaisīta dažādās vietās. Pievienojiet jaunus ierakstus,
+              dalieties ar informāciju un pārliecinieties, ka nekas svarīgs nav
+              palaists garām!
+            </p>
+          </section>
+          <nav class="actions-nav">
+            <button
+              class="action-button primary-button"
+              @click="navigateToLogin"
+            >
+              <i class="fas fa-sign-in-alt"></i> Pieslēgties
+            </button>
+            <button
+              class="action-button secondary-button"
+              @click="navigateToRegister"
+            >
+              <i class="fas fa-user-plus"></i> Reģistrēties
+            </button>
+          </nav>
+        </div>
       </template>
 
       <RegisterView
@@ -259,20 +229,24 @@
         @cancelEditUser="navigateToManageUsers"
       />
 
-      <div v-else-if="isLoadingAuth"><p>Notiek ielāde...</p></div>
+      <div v-else-if="isLoadingAuth" class="loading-indicator">
+        <i class="fas fa-spinner fa-spin"></i> Notiek ielāde...
+      </div>
       <div v-else></div>
       <!-- Fallback empty div -->
     </main>
 
     <footer class="app-footer">
       <p>
-        © {{ new Date().getFullYear() }} KasKurKa. Visas tiesības aizsargātas.
+        © {{ new Date().getFullYear() }} KasKurKa. Izstrādāja Sidnijs Jurčiks.
+        Visas tiesības aizsargātas.
       </p>
     </footer>
   </div>
 </template>
 
 <script>
+// Import statements as before
 import RegisterView from "./views/RegisterView.vue";
 import LoginView from "./views/LoginView.vue";
 import DashboardView from "./views/DashboardView.vue";
@@ -357,13 +331,11 @@ export default {
       console.log("[App.vue] Attempting to refresh current user state...");
       if (!this.currentUser || !localStorage.getItem("token")) {
         console.log("[App.vue] No current user or token, skipping refresh.");
-        return; // Return a resolved promise or nothing if not async explicitly
+        return;
       }
       try {
         const response = await axios.get("/api/auth/me/refresh");
-        const refreshedUser = response.data; // This is the user object
-
-        // Update currentUser state. This will reactively update child components.
+        const refreshedUser = response.data;
         this.currentUser = refreshedUser;
         localStorage.setItem("user", JSON.stringify(this.currentUser));
         console.log("[App.vue] User state refreshed:", this.currentUser);
@@ -373,12 +345,9 @@ export default {
           error.response &&
           (error.response.status === 401 || error.response.status === 403)
         ) {
-          // Token might be invalid or expired, log out user
           this.handleLogout();
-          // Optionally throw error so awaiters in child components can catch it
           throw new Error("User refresh failed, logged out.");
         }
-        // Re-throw for the caller to handle if needed
         throw error;
       }
     },
@@ -415,7 +384,7 @@ export default {
           }
         } catch (e) {
           console.error("Auto-login error, clearing stored data:", e);
-          this.handleLogout(); // Clears stale data
+          this.handleLogout();
         }
       } else {
         if (
@@ -621,143 +590,255 @@ export default {
 </script>
 
 <style>
-/* Styles as before */
+/* Global Styles */
+:root {
+  --primary-color: #007bff; /* Vibrant Blue */
+  --secondary-color: #6c757d; /* Grey */
+  --accent-color: #ffc107; /* Yellow Accent */
+  --success-color: #28a745; /* Green */
+  --danger-color: #dc3545; /* Red */
+  --warning-color: #ffc107; /* Yellow */
+  --info-color: #17a2b8; /* Teal */
+
+  --text-color: #343a40; /* Darker Grey for text */
+  --text-color-light: #f8f9fa; /* Light text for dark backgrounds */
+  --link-color: #007bff;
+  --link-hover-color: #0056b3;
+
+  --bg-color: #f0f2f5; /* Light Grey page background */
+  --card-bg-color: #ffffff; /* White for cards/forms */
+  --header-bg-color: #273444; /* Dark Blue-Grey for header */
+  --footer-bg-color: #212a36; /* Slightly darker for footer */
+
+  --border-color: #dee2e6; /* Light Grey for borders */
+  --border-radius: 0.3rem; /* Softer border radius */
+
+  --font-family-sans-serif: "Inter", -apple-system, BlinkMacSystemFont,
+    "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-size-base: 1rem;
+  --line-height-base: 1.6;
+
+  --shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+  --shadow-md: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+  --shadow-lg: 0 1rem 3rem rgba(0, 0, 0, 0.175);
+}
+
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
-    Arial, sans-serif;
+  font-family: var(--font-family-sans-serif);
   margin: 0;
   padding: 0;
-  background-color: #f4f4f4;
-  color: #333;
-  line-height: 1.6;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  line-height: var(--line-height-base);
+  font-size: var(--font-size-base);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
+
 #app-container {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  text-align: center;
 }
+
+/* Header Styles */
 .app-header {
-  background-color: #2c3e50;
-  color: #ecf0f1;
-  padding: 20px 0;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  background-color: var(--header-bg-color);
+  color: var(--text-color-light);
+  padding: 1rem 1.5rem;
+  box-shadow: var(--shadow-md);
+  z-index: 1000; /* Keep header on top */
+}
+.app-header .header-content {
   display: flex;
-  justify-content: space-around; /* Changed to space-around for better link spacing */
+  justify-content: space-between;
   align-items: center;
-  flex-wrap: wrap; /* Allow wrapping for smaller screens */
+  flex-wrap: wrap;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+.app-header .logo-title-container {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.app-header .logo-icon {
+  font-size: 2rem;
+  color: var(--accent-color);
 }
 .app-header h1 {
   margin: 0;
-  font-size: 2.5em;
-  text-align: center;
-  /* flex-grow: 1; Removed to allow natural sizing with more links */
+  font-size: 1.75rem; /* Adjusted size */
+  font-weight: 700;
+  letter-spacing: -0.5px;
 }
-.header-user-info {
+.app-header .header-user-info {
   display: flex;
   align-items: center;
-  gap: 15px; /* Add gap between items */
-  margin-right: 20px; /* Keep margin for overall spacing */
+  gap: 1rem; /* Consistent gap */
+  flex-wrap: wrap;
 }
-.user-greeting {
-  font-size: 1em;
-  /* margin-left: 15px; Removed, using gap now */
-}
-.admin-panel-link,
-.profile-link {
-  /* Added profile-link */
-  color: #f1c40f;
+.app-header .header-link {
+  color: #e0e0e0; /* Lighter for better contrast on dark header */
   text-decoration: none;
-  font-weight: bold;
-  /* margin-left: 15px; Removed, using gap now */
+  font-weight: 500;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--border-radius);
+  transition: background-color 0.2s ease, color 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
-.admin-panel-link:hover,
-.profile-link:hover {
-  text-decoration: underline;
+.app-header .header-link:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: var(--text-color-light);
 }
+.app-header .profile-link {
+  color: var(--accent-color);
+}
+.app-header .profile-link:hover {
+  color: #fff;
+  background-color: var(--accent-color);
+}
+.app-header .admin-panel-link {
+  color: var(--info-color);
+}
+.app-header .admin-panel-link:hover {
+  color: #fff;
+  background-color: var(--info-color);
+}
+
+.app-header .user-greeting {
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.app-header .user-greeting .user-group-display {
+  font-size: 0.85rem;
+  opacity: 0.8;
+  margin-left: 0.25rem;
+}
+
+/* Main Content Styles */
 .app-main {
   flex-grow: 1;
-  padding: 20px;
+  padding: 1.5rem;
   margin: 0 auto;
   width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  max-width: 1200px; /* Consistent max width */
+  box-sizing: border-box;
 }
-.app-main > .intro-section {
-  max-width: 800px;
-  background-color: #fff;
-  border-radius: 8px;
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
-  padding: 20px;
+.home-container {
   width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+}
+.card-style {
+  /* General card styling for intro section, etc. */
+  background-color: var(--card-bg-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-sm);
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+.intro-section {
+  /* Inherits from card-style */
+  text-align: left;
+}
+.intro-section .intro-title {
+  font-size: 1.75rem;
+  color: var(--header-bg-color); /* Use a darker color for titles */
+  margin-bottom: 1rem;
+  text-align: center;
 }
 .intro-section p {
-  font-size: 1.1em;
+  font-size: 1.05rem;
   color: #555;
-  margin-bottom: 30px;
-  padding: 0 15px;
-  text-align: left;
+  line-height: 1.7;
+  margin-bottom: 1rem;
 }
+
 .actions-nav {
-  margin-top: 20px;
-  max-width: 800px;
-  width: 100%;
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-top: 1.5rem;
 }
+
+/* Button Styles */
 .action-button {
-  background-color: #3498db;
-  color: white;
   border: none;
-  padding: 12px 25px;
-  margin: 5px 10px;
-  border-radius: 5px;
-  font-size: 1em;
+  padding: 0.75rem 1.5rem;
+  border-radius: var(--border-radius);
+  font-size: 1rem;
+  font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.3s ease;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease,
+    transform 0.1s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-decoration: none;
+  white-space: nowrap;
 }
-.action-button:hover {
-  background-color: #2980b9;
+.action-button:hover:not([disabled]) {
+  box-shadow: var(--shadow-sm);
 }
-.action-button:active {
-  background-color: #2471a3;
+.action-button:active:not([disabled]) {
+  transform: translateY(1px);
+}
+.action-button.primary-button {
+  background-color: var(--primary-color);
+  color: var(--text-color-light);
+}
+.action-button.primary-button:hover:not([disabled]) {
+  background-color: #0069d9; /* Darker primary */
+}
+.action-button.secondary-button {
+  background-color: var(--secondary-color);
+  color: var(--text-color-light);
+}
+.action-button.secondary-button:hover:not([disabled]) {
+  background-color: #5a6268; /* Darker secondary */
 }
 .action-button[disabled] {
-  background-color: #bdc3c7;
+  background-color: #e9ecef;
+  color: #6c757d;
   cursor: not-allowed;
+  opacity: 0.7;
 }
-.action-button[disabled]:hover {
-  background-color: #bdc3c7;
-}
-.app-footer {
-  background-color: #34495e;
-  color: #bdc3c7;
-  padding: 15px 0;
-  font-size: 0.9em;
-  margin-top: auto;
-}
+
+/* Form Styles */
 .form-view {
-  max-width: 600px;
-  margin: 20px auto;
-  padding: 25px;
-  background-color: #fff;
-  border-radius: 8px;
-  box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+  max-width: 650px; /* Slightly wider forms */
+  margin: 1rem auto; /* Consistent margin */
+  padding: 2rem; /* More padding */
+  background-color: var(--card-bg-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-md);
   text-align: left;
   width: 100%;
+  box-sizing: border-box;
 }
 .form-view h2 {
   text-align: center;
-  color: #2c3e50;
-  margin-bottom: 25px;
+  color: var(--header-bg-color); /* Darker for titles */
+  margin-top: 0;
+  margin-bottom: 1.5rem; /* More space */
+  font-size: 1.75rem;
+  font-weight: 600;
 }
 .form-group {
-  margin-bottom: 20px;
+  margin-bottom: 1.25rem; /* Consistent spacing */
 }
 .form-group label {
   display: block;
-  margin-bottom: 8px;
-  font-weight: bold;
-  color: #34495e;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+  color: var(--text-color); /* Darker label color */
+  font-size: 0.95rem;
 }
 .form-group input[type="text"],
 .form-group input[type="email"],
@@ -767,142 +848,191 @@ body {
 .form-group input[type="time"],
 .form-group textarea,
 .form-group select {
-  width: calc(100% - 24px);
-  padding: 12px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  font-size: 1em;
+  width: 100%; /* Full width with box-sizing */
+  padding: 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  font-size: 1rem;
   box-sizing: border-box;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  background-color: #fff; /* Ensure inputs have a background */
 }
 .form-group input[type="file"] {
-  width: calc(100% - 24px);
-  padding: 8px;
+  padding: 0.5rem; /* Adjusted padding for file input */
 }
 .form-group textarea {
-  min-height: 100px;
+  min-height: 120px;
   resize: vertical;
 }
 .form-group input:focus,
 .form-group textarea:focus,
 .form-group select:focus {
-  border-color: #3498db;
+  border-color: var(--primary-color);
   outline: none;
-  box-shadow: 0 0 0 0.2rem rgba(52, 152, 219, 0.25);
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
 }
 .form-group small {
   display: block;
-  margin-top: 5px;
-  font-size: 0.85em;
-  color: #7f8c8d;
+  margin-top: 0.3rem;
+  font-size: 0.85rem;
+  color: #6c757d; /* Lighter grey for help text */
+}
+.required-field {
+  color: var(--danger-color);
+  margin-left: 2px;
+}
+
+/* Message Styles */
+.error-message,
+.success-message {
+  padding: 0.8rem 1rem;
+  border-radius: var(--border-radius);
+  margin-bottom: 1rem;
+  text-align: center;
+  font-weight: 500;
 }
 .error-message {
-  color: #e74c3c;
-  background-color: #fdd;
-  border: 1px solid #e74c3c;
-  padding: 10px;
-  border-radius: 4px;
-  margin-bottom: 15px;
-  text-align: center;
+  color: #721c24; /* Darker red text */
+  background-color: #f8d7da; /* Lighter red background */
+  border: 1px solid #f5c6cb; /* Reddish border */
 }
 .success-message {
-  color: #2ecc71;
-  background-color: #e6ffed;
-  border: 1px solid #2ecc71;
-  padding: 10px;
-  border-radius: 4px;
-  margin-bottom: 15px;
-  text-align: center;
+  color: #155724; /* Darker green text */
+  background-color: #d4edda; /* Lighter green background */
+  border: 1px solid #c3e6cb; /* Greenish border */
 }
+
+/* Back Button & Form Actions */
 .back-button {
   background: none;
   border: none;
-  color: #3498db;
-  font-size: 1em;
+  color: var(--link-color);
+  font-size: 0.95rem;
+  font-weight: 500;
   cursor: pointer;
-  padding: 5px 0;
-  margin-bottom: 15px;
-  display: inline-block;
+  padding: 0.25rem 0;
+  margin-bottom: 1rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
 }
 .back-button:hover {
+  color: var(--link-hover-color);
   text-decoration: underline;
 }
 .form-actions {
   display: flex;
-  justify-content: space-between;
+  justify-content: space-between; /* Default */
   align-items: center;
-  margin-top: 20px;
+  margin-top: 1.5rem;
 }
-.required-field {
-  color: #e74c3c;
-  margin-left: 2px;
+.form-actions .action-button {
+  /* Ensure form buttons take priority if specific classes are used */
+  /* width: auto; Allow natural sizing */
 }
+
+/* Footer Styles */
+.app-footer {
+  background-color: var(--footer-bg-color);
+  color: #adb5bd; /* Lighter grey for footer text */
+  padding: 1.5rem 1rem;
+  font-size: 0.85rem;
+  text-align: center;
+  margin-top: auto; /* Push to bottom */
+}
+
+/* Loading Indicator */
+.loading-indicator {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 2rem;
+  font-size: 1.2rem;
+  color: var(--primary-color);
+}
+.loading-indicator .fa-spinner {
+  margin-right: 0.75rem;
+}
+
+/* Responsive Adjustments */
 @media (max-width: 768px) {
-  .app-header {
+  .app-header .header-content {
     flex-direction: column;
-    gap: 10px; /* Spacing for wrapped items */
+    gap: 0.75rem;
   }
   .app-header h1 {
-    margin-bottom: 10px;
+    font-size: 1.5rem;
   }
-  .header-user-info {
+  .app-header .header-user-info {
     flex-direction: column;
     align-items: center;
-    margin-right: 0;
-    gap: 10px;
+    width: 100%;
+    gap: 0.5rem;
   }
-  .user-greeting,
-  .admin-panel-link,
-  .profile-link {
-    /* Ensure these stack nicely */
-    margin: 0; /* Reset individual margins */
+  .app-header .header-link {
+    width: 100%;
+    justify-content: center;
   }
   .form-view {
-    margin: 20px 10px;
-    padding: 20px;
+    margin: 1rem;
+    padding: 1.5rem;
   }
 }
+
 @media (max-width: 600px) {
+  :root {
+    --font-size-base: 0.95rem;
+  } /* Slightly smaller base font for small screens */
+
+  .app-header {
+    padding: 0.75rem 1rem;
+  }
+  .app-header .logo-icon {
+    font-size: 1.75rem;
+  }
   .app-header h1 {
-    font-size: 2em;
+    font-size: 1.4rem;
+  }
+
+  .intro-section .intro-title {
+    font-size: 1.5rem;
   }
   .intro-section p {
-    font-size: 1em;
+    font-size: 1rem;
   }
-  .app-main > .intro-section {
-    margin: 10px;
-    padding: 15px;
-  }
-  .action-button {
-    padding: 10px 15px;
-    font-size: 0.9em;
-    display: block;
-    width: calc(100% - 20px);
-    max-width: 300px;
-    margin: 10px auto;
+
+  .actions-nav .action-button {
+    width: 100%;
+    max-width: 320px;
+    margin: 0.5rem auto;
   }
   .app-main {
-    padding: 10px;
+    padding: 1rem;
   }
-  .form-group input[type="text"],
-  .form-group input[type="email"],
-  .form-group input[type="password"],
-  .form-group input[type="number"],
-  .form-group input[type="date"],
-  .form-group input[type="time"],
-  .form-group textarea,
-  .form-group select {
-    font-size: 0.95em;
+  .form-view {
+    padding: 1.25rem;
   }
+  .form-view h2 {
+    font-size: 1.5rem;
+  }
+
   .form-actions {
-    flex-direction: column-reverse;
+    flex-direction: column;
   }
   .form-actions .action-button {
     width: 100%;
-    margin-bottom: 10px;
+    margin-bottom: 0.75rem;
+  }
+  .form-actions .action-button.secondary-action, /* E.g. cancel button */
+   .form-actions .back-button {
+    margin-top: 0.5rem; /* Spacing for secondary actions below primary */
+    order: 2; /* Push them below primary action */
+  }
+  .form-actions .action-button:not(.secondary-action) {
+    order: 1; /* Primary action first */
   }
   .form-actions .back-button {
-    margin-bottom: 15px;
-    align-self: flex-start;
+    align-self: center;
   }
 }
 </style>

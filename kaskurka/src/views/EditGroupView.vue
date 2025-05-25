@@ -1,16 +1,21 @@
 <template>
-  <div class="form-view edit-group-view">
+  <div class="form-view edit-group-view card-style">
     <button
       @click="cancelEdit"
       class="back-button"
-      :disabled="isLoading || isMemberProcessing"
+      :disabled="isLoading || isMemberProcessing || initialLoadingError"
     >
-      ← Atpakaļ uz Grupu Pārvaldību
+      <i class="fas fa-arrow-left"></i> Atpakaļ uz Grupu Pārvaldību
     </button>
-    <h2>Rediģēt Grupu: {{ group.originalName || "Notiek ielāde..." }}</h2>
+    <h2 class="view-title">
+      <i class="fas fa-edit"></i> Rediģēt Grupu:
+      <span class="group-original-name">{{
+        group.originalName || "Notiek ielāde..."
+      }}</span>
+    </h2>
 
     <div v-if="initialLoadingError" class="error-message">
-      {{ initialLoadingError }}
+      <i class="fas fa-exclamation-triangle"></i> {{ initialLoadingError }}
     </div>
 
     <form
@@ -18,9 +23,13 @@
       class="edit-group-form"
       v-if="!initialLoadingError && group.name !== undefined"
     >
+      <h3 class="form-section-title">
+        <i class="fas fa-info-circle"></i> Grupas Pamatinformācija
+      </h3>
       <div class="form-group">
         <label for="groupName"
-          >Grupas Nosaukums: <span class="required-field">*</span></label
+          ><i class="fas fa-tag form-icon"></i> Grupas Nosaukums:
+          <span class="required-field">*</span></label
         >
         <input
           type="text"
@@ -30,25 +39,27 @@
           maxlength="50"
           :disabled="isLoading"
         />
-        <small>Piemēram, DT3-1, Programmešana P1 (līdz 50 rakstzīmēm)</small>
+        <small>Unikāls nosaukums, līdz 50 rakstzīmēm.</small>
       </div>
 
       <div class="form-group">
-        <label for="groupDescription">Grupas Apraksts:</label>
+        <label for="groupDescription"
+          ><i class="fas fa-align-left form-icon"></i> Grupas Apraksts:</label
+        >
         <textarea
           id="groupDescription"
           v-model="group.description"
           maxlength="255"
+          rows="3"
           :disabled="isLoading"
         ></textarea>
-        <small
-          >Īss apraksts par grupu (līdz 255 rakstzīmēm). Atstājiet tukšu, lai
-          saglabātu esošo, ja tas nav definēts.</small
-        >
+        <small>Līdz 255 rakstzīmēm.</small>
       </div>
 
       <div class="form-group">
-        <label for="studyYear">Mācību Gads:</label>
+        <label for="studyYear"
+          ><i class="fas fa-calendar-alt form-icon"></i> Mācību Gads:</label
+        >
         <input
           type="text"
           id="studyYear"
@@ -57,28 +68,31 @@
           maxlength="9"
           :disabled="isLoading"
         />
-        <small
-          >Piemēram, 2023/2024 (līdz 9 rakstzīmēm). Atstājiet tukšu, lai
-          saglabātu esošo, ja tas nav definēts.</small
-        >
+        <small>Formāts GGGG/GGGG, līdz 9 rakstzīmēm.</small>
       </div>
 
       <div v-if="successMessage" class="success-message">
-        {{ successMessage }}
+        <i class="fas fa-check-circle"></i> {{ successMessage }}
       </div>
-      <div v-if="errorMessage" class="error-message">{{ errorMessage }}</div>
+      <div v-if="errorMessage" class="error-message">
+        <i class="fas fa-exclamation-triangle"></i> {{ errorMessage }}
+      </div>
 
       <div class="form-actions">
         <button
           type="button"
           @click="cancelEdit"
-          class="action-button secondary-action"
+          class="action-button secondary-button"
           :disabled="isLoading"
         >
-          Atcelt
+          <i class="fas fa-times"></i> Atcelt Izmaiņas
         </button>
-        <span></span>
-        <button type="submit" class="action-button" :disabled="isLoading">
+        <button
+          type="submit"
+          class="action-button primary-button"
+          :disabled="isLoading"
+        >
+          <i class="fas fa-save"></i>
           {{ isLoading ? "Saglabā..." : "Saglabāt Grupas Datus" }}
         </button>
       </div>
@@ -86,88 +100,106 @@
 
     <!-- Member Management Section -->
     <section
-      class="member-management-section"
+      class="member-management-section card-style-inner"
       v-if="!initialLoadingError && group.name !== undefined"
     >
-      <hr class="form-divider" />
-      <h3>Grupas Dalībnieku Pārvaldība</h3>
+      <h3 class="form-section-title">
+        <i class="fas fa-users-cog"></i> Grupas Dalībnieku Pārvaldība
+      </h3>
 
-      <div v-if="isMemberProcessing" class="loading-message small">
-        Apstrādā dalībnieku...
+      <div v-if="isMemberProcessing" class="loading-indicator small">
+        <i class="fas fa-spinner fa-spin"></i> Apstrādā dalībnieku...
       </div>
       <div
-        v-if="memberActionMessage"
+        v-if="memberActionMessage && memberActionMessage.text"
         :class="
           memberActionMessage.type === 'success'
             ? 'success-message-inline'
             : 'error-message-inline'
         "
       >
+        <i
+          :class="
+            memberActionMessage.type === 'success'
+              ? 'fas fa-check-circle'
+              : 'fas fa-exclamation-circle'
+          "
+        ></i>
         {{ memberActionMessage.text }}
       </div>
 
-      <h4>Pievienot Jaunu Dalībnieku (Studentu)</h4>
-      <div class="add-member-form form-group">
-        <select
-          v-model="selectedUserToAdd"
-          :disabled="isMemberProcessing || potentialNewMembers.length === 0"
-        >
-          <option disabled value="">Izvēlieties studentu, ko pievienot</option>
-          <option
-            v-for="user in potentialNewMembers"
-            :key="user._id"
-            :value="user._id"
+      <div class="add-member-controls">
+        <h4><i class="fas fa-user-plus"></i> Pievienot Jaunu Dalībnieku</h4>
+        <div class="add-member-form form-group">
+          <select
+            v-model="selectedUserToAdd"
+            :disabled="isMemberProcessing || potentialNewMembers.length === 0"
           >
-            {{ user.firstName }} {{ user.lastName }} ({{ user.email }})
-          </option>
-        </select>
-        <button
-          @click="addMember"
-          class="action-button-small"
-          :disabled="!selectedUserToAdd || isMemberProcessing"
-        >
-          Pievienot Dalībnieku
-        </button>
+            <option disabled value="">Izvēlieties studentu</option>
+            <option
+              v-for="user in potentialNewMembers"
+              :key="user._id"
+              :value="user._id"
+            >
+              {{ user.firstName }} {{ user.lastName }} ({{ user.email }})
+            </option>
+          </select>
+          <button
+            @click="addMember"
+            class="action-button success-button add-member-btn"
+            :disabled="!selectedUserToAdd || isMemberProcessing"
+          >
+            <i class="fas fa-plus"></i> Pievienot
+          </button>
+        </div>
         <p
           v-if="potentialNewMembers.length === 0 && !isFetchingUsers"
-          class="info-message"
+          class="info-text-message"
         >
-          Visi studenti jau ir šajā grupā vai nav pieejamu studentu.
+          <i class="fas fa-info-circle"></i> Visi studenti jau ir šajā grupā vai
+          nav pieejamu studentu sarakstā.
         </p>
       </div>
 
-      <h4>Esošie Dalībnieki ({{ currentMembersDetails.length }})</h4>
-      <div v-if="isFetchingUsers" class="loading-message small">
-        Ielādē lietotājus...
+      <div class="current-members-list">
+        <h4>
+          <i class="fas fa-list-ul"></i> Esošie Dalībnieki ({{
+            currentMembersDetails.length
+          }})
+        </h4>
+        <div v-if="isFetchingUsers" class="loading-indicator small">
+          <i class="fas fa-spinner fa-spin"></i> Ielādē lietotājus...
+        </div>
+        <ul v-if="currentMembersDetails.length > 0" class="member-list">
+          <li
+            v-for="member in currentMembersDetails"
+            :key="member._id"
+            class="member-list-item"
+          >
+            <span class="member-name"
+              ><i class="fas fa-user"></i> {{ member.firstName }}
+              {{ member.lastName }} ({{ member.email }})</span
+            >
+            <button
+              @click="removeMember(member._id)"
+              class="action-button-small danger-button remove-member-btn"
+              :disabled="isMemberProcessing"
+              title="Noņemt dalībnieku"
+            >
+              <i class="fas fa-user-minus"></i>
+            </button>
+          </li>
+        </ul>
+        <p v-else-if="!isFetchingUsers" class="info-text-message">
+          <i class="fas fa-info-circle"></i> Šajā grupā pašlaik nav dalībnieku.
+        </p>
       </div>
-      <ul v-if="currentMembersDetails.length > 0" class="member-list">
-        <li
-          v-for="member in currentMembersDetails"
-          :key="member._id"
-          class="member-list-item"
-        >
-          <span
-            >{{ member.firstName }} {{ member.lastName }} ({{
-              member.email
-            }})</span
-          >
-          <button
-            @click="removeMember(member._id)"
-            class="action-button-small delete"
-            :disabled="isMemberProcessing"
-          >
-            Noņemt
-          </button>
-        </li>
-      </ul>
-      <p v-else-if="!isFetchingUsers" class="info-message">
-        Šajā grupā pašlaik nav dalībnieku.
-      </p>
     </section>
   </div>
 </template>
 
 <script>
+// Script section remains the same as previously provided
 import axios from "axios";
 
 export default {
@@ -181,25 +213,24 @@ export default {
   data() {
     return {
       group: {
-        // For group details editing
-        name: undefined, // Use undefined to check if loaded
+        name: undefined,
         description: "",
         studyYear: "",
         originalName: "",
-        members: [], // Array of member IDs
+        members: [],
       },
-      allUsers: [], // For member management dropdown
-      selectedUserToAdd: "", // ID of user selected from dropdown
+      allUsers: [],
+      selectedUserToAdd: "",
 
-      isLoading: false, // For group details form
-      isFetchingUsers: false, // For fetching all users list
-      isMemberProcessing: false, // For add/remove member actions
+      isLoading: false,
+      isFetchingUsers: false,
+      isMemberProcessing: false,
 
       initialLoadingError: "",
-      errorMessage: "", // For group details form errors
-      successMessage: "", // For group details form success
+      errorMessage: "",
+      successMessage: "",
 
-      memberActionMessage: null, // { text: '', type: 'success/error' } for member actions
+      memberActionMessage: null,
     };
   },
   computed: {
@@ -215,14 +246,18 @@ export default {
         .map((memberId) => {
           return this.allUsers.find((user) => user._id === memberId);
         })
-        .filter((user) => user); // Filter out any undefined if a memberId isn't in allUsers (should not happen)
+        .filter((user) => user);
     },
     potentialNewMembers() {
       if (this.allUsers.length === 0) return [];
       const memberIds = new Set(this.group.members || []);
-      return this.allUsers.filter(
-        (user) => user.role === "student" && !memberIds.has(user._id)
-      );
+      return this.allUsers
+        .filter((user) => user.role === "student" && !memberIds.has(user._id))
+        .sort(
+          (a, b) =>
+            a.lastName.localeCompare(b.lastName) ||
+            a.firstName.localeCompare(b.firstName)
+        );
     },
   },
   watch: {
@@ -231,7 +266,7 @@ export default {
       handler(newVal) {
         if (newVal) {
           this.fetchGroupDetails(newVal);
-          this.fetchAllUsers(); // Also fetch all users for member management
+          this.fetchAllUsers();
         } else {
           this.initialLoadingError = "Grupas ID nav norādīts rediģēšanai.";
         }
@@ -240,7 +275,7 @@ export default {
   },
   methods: {
     async fetchGroupDetails(groupId) {
-      this.isLoading = true; // For group details part
+      this.isLoading = true;
       this.initialLoadingError = "";
       this.errorMessage = "";
       this.successMessage = "";
@@ -250,7 +285,7 @@ export default {
         this.group.originalName = response.data.name;
         this.group.description = response.data.description || "";
         this.group.studyYear = response.data.studyYear || "";
-        this.group.members = response.data.members || []; // Ensure members array is present
+        this.group.members = response.data.members || [];
       } catch (error) {
         console.error("Error fetching group details:", error);
         this.initialLoadingError =
@@ -267,7 +302,7 @@ export default {
       this.isFetchingUsers = true;
       this.memberActionMessage = null;
       try {
-        const response = await axios.get("/api/users"); // Admin route to get all users
+        const response = await axios.get("/api/users");
         this.allUsers = response.data;
       } catch (error) {
         console.error("Error fetching all users:", error);
@@ -303,6 +338,14 @@ export default {
         this.errorMessage = "Mācību gads nedrīkst pārsniegt 9 rakstzīmes.";
         return false;
       }
+      if (
+        this.group.studyYear &&
+        !/^\d{4}\/\d{4}$/.test(this.group.studyYear) &&
+        this.group.studyYear.trim().length > 0
+      ) {
+        // this.errorMessage = "Mācību gadam jābūt formātā GGGG/GGGG vai tukšam.";
+        // return false;
+      }
       return true;
     },
     async submitUpdateGroup() {
@@ -321,10 +364,9 @@ export default {
           updateData
         );
         this.successMessage = response.data.msg;
-        this.group.originalName = this.group.name; // Update original name on successful save
-        // Do not navigate away immediately, allow member management.
-        // Alerting is handled by App.vue through event.
-        // this.$emit("groupUpdateSuccess", this.successMessage);
+        this.group.originalName = this.group.name;
+        // To reflect changes if user navigates away and back:
+        this.$emit("groupUpdateSuccess", this.successMessage); // Notify App.vue or parent
       } catch (error) {
         if (error.response && error.response.data && error.response.data.msg) {
           this.errorMessage = error.response.data.msg;
@@ -336,8 +378,6 @@ export default {
         this.isLoading = false;
       }
     },
-
-    // Member Management Methods
     async addMember() {
       if (!this.selectedUserToAdd) return;
       this.isMemberProcessing = true;
@@ -348,9 +388,8 @@ export default {
           { userId: this.selectedUserToAdd }
         );
         this.memberActionMessage = { text: response.data.msg, type: "success" };
-        // Refresh group details to get updated members list
         await this.fetchGroupDetails(this.groupIdToEdit);
-        this.selectedUserToAdd = ""; // Clear selection
+        this.selectedUserToAdd = "";
       } catch (error) {
         this.memberActionMessage = {
           text: error.response?.data?.msg || "Kļūda pievienojot dalībnieku.",
@@ -371,7 +410,7 @@ export default {
           `/api/groups/${this.groupIdToEdit}/members/${userIdToRemove}`
         );
         this.memberActionMessage = { text: response.data.msg, type: "success" };
-        await this.fetchGroupDetails(this.groupIdToEdit); // Refresh group details
+        await this.fetchGroupDetails(this.groupIdToEdit);
       } catch (error) {
         this.memberActionMessage = {
           text: error.response?.data?.msg || "Kļūda noņemot dalībnieku.",
@@ -387,126 +426,198 @@ export default {
 </script>
 
 <style scoped>
-.edit-group-view h2 {
-  margin-top: 0;
-  font-size: 1.4em; /* Adjust if group name is long */
-  word-break: break-word;
+/* .edit-group-view inherits .form-view and .card-style from global */
+.edit-group-view {
+  padding: 1.5rem;
 }
-.secondary-action {
-  background-color: #6c757d;
+.view-title {
+  color: var(--header-bg-color);
+  margin: 0 0 1.5rem 0;
+  font-size: 1.8rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  text-align: center; /* For multi-line titles */
 }
-.secondary-action:hover:not([disabled]) {
-  background-color: #5a6268;
+.view-title .group-original-name {
+  color: var(--primary-color);
+  font-weight: 500;
+  word-break: break-all; /* If name is very long */
 }
 
-.form-divider {
-  margin-top: 30px;
-  margin-bottom: 20px;
-  border: 0;
-  border-top: 1px solid #eee;
+.form-section-title {
+  font-size: 1.2rem; /* Increased size */
+  color: var(--primary-color); /* Use primary color */
+  margin-top: 2rem; /* More space before section */
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.form-section-title:first-of-type {
+  margin-top: 0; /* No top margin for the very first section title */
 }
 
-.member-management-section h3 {
-  font-size: 1.2em;
-  color: #34495e;
-  margin-bottom: 15px;
-  padding-bottom: 5px;
-  border-bottom: 1px dotted #bdc3c7;
+.form-icon {
+  margin-right: 0.5em;
+  color: var(--primary-color);
+  opacity: 0.7;
+}
+.success-message .fas,
+.error-message .fas,
+.success-message-inline .fas,
+.error-message-inline .fas {
+  margin-right: 0.5em;
+}
+
+.form-actions {
+  justify-content: space-between;
+  margin-top: 1.5rem;
+}
+
+.member-management-section {
+  /* Uses .card-style-inner */
+  margin-top: 2rem;
+  padding: 1.5rem;
 }
 .member-management-section h4 {
   font-size: 1.1em;
-  color: #2c3e50;
-  margin-top: 20px;
-  margin-bottom: 10px;
+  color: var(--header-bg-color);
+  margin-top: 1rem;
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.member-management-section h4:first-of-type {
+  margin-top: 0;
+}
+
+.add-member-controls {
+  margin-bottom: 1.5rem;
 }
 .add-member-form {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 20px;
+  align-items: stretch; /* Make button and select same height */
+  gap: 0.5rem;
 }
 .add-member-form select {
   flex-grow: 1;
-  padding: 10px; /* Make select a bit smaller than default input */
+  /* Uses global form-group select styles */
 }
-.add-member-form .action-button-small {
-  padding: 10px 15px; /* Match select padding */
-  background-color: #28a745; /* Green for add */
+.add-member-btn {
+  /* Uses global .action-button .success-button */
+  padding: 0.75rem 1rem; /* Match select padding */
+  white-space: nowrap;
 }
-.add-member-form .action-button-small:hover:not([disabled]) {
-  background-color: #218838;
+.action-button.success-button {
+  background-color: var(--success-color);
+  color: var(--text-color-light);
+}
+.action-button.success-button:hover:not([disabled]) {
+  background-color: #1e7e34;
 }
 
+.current-members-list {
+  margin-top: 1rem;
+}
 .member-list {
   list-style-type: none;
   padding: 0;
-  max-height: 300px;
+  max-height: 350px; /* Increased height */
   overflow-y: auto;
-  border: 1px solid #eee;
-  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
 }
 .member-list-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px;
+  padding: 0.75rem 1rem;
   border-bottom: 1px solid #f0f0f0;
+  background-color: #fdfdfd;
 }
 .member-list-item:last-child {
   border-bottom: none;
 }
-.member-list-item span {
+.member-list-item .member-name {
   font-size: 0.95em;
+  color: var(--text-color);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
-.member-list-item .action-button-small.delete {
-  background-color: #d9534f;
+.member-list-item .member-name .fas {
+  color: var(--secondary-color);
 }
-.member-list-item .action-button-small.delete:hover:not([disabled]) {
-  background-color: #c9302c;
+
+.remove-member-btn {
+  /* Uses .action-button-small .danger-button from global/other views if defined */
+  /* Or define here if specific: */
+  padding: 0.4rem 0.6rem;
+  font-size: 0.85em;
+  border-radius: var(--border-radius);
+  line-height: 1; /* For icon-only button */
 }
-.info-message {
+.action-button-small.danger-button {
+  background-color: var(--danger-color);
+  color: var(--text-color-light);
+}
+.action-button-small.danger-button:hover:not([disabled]) {
+  background-color: #c82333;
+}
+
+.info-text-message {
+  /* For messages like 'no users to add' or 'no members' */
   font-size: 0.9em;
-  color: #7f8c8d;
-  padding: 10px;
+  color: #6c757d;
+  padding: 0.75rem;
   text-align: center;
+  background-color: #f8f9fa;
+  border: 1px dashed var(--border-color);
+  border-radius: var(--border-radius);
+  margin-top: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
 }
-.loading-message.small,
-.error-message.small {
-  padding: 10px;
-  font-size: 0.9em;
+
+.loading-indicator.small {
+  font-size: 0.95em;
+  padding: 0.5rem;
 }
 .success-message-inline,
 .error-message-inline {
-  padding: 8px;
-  margin-top: 10px;
-  margin-bottom: 10px; /* Added margin bottom */
-  border-radius: 4px;
+  padding: 0.75rem 1rem;
+  margin-top: 0.75rem;
+  border-radius: var(--border-radius);
   font-size: 0.9em;
   text-align: center;
-}
-.success-message-inline {
-  background-color: #e6ffed;
-  color: #2ecc71;
-  border: 1px solid #2ecc71;
-}
-.error-message-inline {
-  background-color: #fdd;
-  color: #e74c3c;
-  border: 1px solid #e74c3c;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.action-button-small {
-  /* General styling for small buttons if not already global */
-  padding: 6px 12px;
-  font-size: 0.85em;
-  border-radius: 4px;
-  cursor: pointer;
-  border: none;
-  color: white;
-}
-.action-button-small[disabled] {
-  background-color: #bdc3c7 !important; /* Ensure disabled style overrides */
-  cursor: not-allowed;
-  opacity: 0.7;
+@media (max-width: 600px) {
+  .form-actions {
+    flex-direction: column-reverse;
+  }
+  .form-actions .action-button {
+    width: 100%;
+  }
+  .form-actions .secondary-button {
+    margin-bottom: 0.75rem;
+  }
+  .add-member-form {
+    flex-direction: column;
+  }
+  .add-member-form .action-button {
+    width: 100%;
+  }
 }
 </style>

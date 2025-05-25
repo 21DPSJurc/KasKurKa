@@ -1,21 +1,23 @@
 <template>
-  <div class="form-view add-homework-view">
+  <div class="form-view add-homework-view card-style">
     <button
       @click="handleBackNavigation"
       class="back-button"
-      :disabled="isLoading"
+      :disabled="isLoading || isLoadingInitialData"
     >
-      ← {{ itemIdToEdit ? "Atpakaļ uz Sarakstu" : "Atpakaļ uz Paneli" }}
+      <i class="fas fa-arrow-left"></i>
+      {{ itemIdToEdit ? "Atpakaļ uz Sarakstu" : "Atpakaļ uz Paneli" }}
     </button>
-    <h2>
+    <h2 class="view-title">
+      <i :class="itemIdToEdit ? 'fas fa-edit' : 'fas fa-plus-circle'"></i>
       {{ itemIdToEdit ? "Rediģēt Mājasdarbu" : "Pievienot Jaunu Mājasdarbu" }}
     </h2>
 
-    <div v-if="isLoadingInitialData" class="loading-message">
-      Notiek datu ielāde...
+    <div v-if="isLoadingInitialData" class="loading-indicator">
+      <i class="fas fa-spinner fa-spin"></i> Notiek datu ielāde...
     </div>
     <div v-else-if="!canAddOrEditLogic" class="error-message">
-      {{ addEditNotAllowedMessage }}
+      <i class="fas fa-exclamation-triangle"></i> {{ addEditNotAllowedMessage }}
     </div>
 
     <form
@@ -25,8 +27,8 @@
     >
       <div class="form-group">
         <label for="customGroupId"
-          >Grupa (kam redzams mājasdarbs):
-          <span class="required-field">*</span></label
+          ><i class="fas fa-users form-icon"></i> Grupa (kam redzams
+          mājasdarbs): <span class="required-field">*</span></label
         >
         <select
           id="customGroupId"
@@ -49,9 +51,9 @@
             currentUser.role === 'student' &&
             availableCustomGroups.length === 0
           "
-          >Jums jābūt vismaz vienas grupas dalībniekam, lai pievienotu
-          mājasdarbu. Mēģiniet vēlreiz ielādēt lapu vai sazinieties ar
-          administratoru, ja nesen tikāt pievienots jaunai grupai.</small
+          class="info-text"
+          ><i class="fas fa-info-circle"></i> Jums jābūt vismaz vienas grupas
+          dalībniekam.</small
         >
         <small
           v-if="
@@ -59,13 +61,16 @@
             currentUser.role === 'admin' &&
             availableCustomGroups.length === 0
           "
-          >Nav pieejamu grupu sistēmā. Lūdzu, izveidojiet grupu vispirms.</small
+          class="info-text"
+          ><i class="fas fa-info-circle"></i> Nav pieejamu grupu sistēmā. Lūdzu,
+          izveidojiet grupu.</small
         >
       </div>
 
       <div class="form-group">
         <label for="subject"
-          >Mācību priekšmets: <span class="required-field">*</span></label
+          ><i class="fas fa-book form-icon"></i> Mācību priekšmets:
+          <span class="required-field">*</span></label
         >
         <input
           type="text"
@@ -73,6 +78,7 @@
           v-model="homework.subject"
           required
           maxlength="50"
+          placeholder="Piem., Programmēšanas pamati"
           :disabled="isLoading"
         />
         <small>Līdz 50 rakstzīmēm.</small>
@@ -80,14 +86,16 @@
 
       <div class="form-group">
         <label for="description"
-          >Detalizēts uzdevuma apraksts:
-          <span class="required-field">*</span></label
+          ><i class="fas fa-file-alt form-icon"></i> Detalizēts uzdevuma
+          apraksts: <span class="required-field">*</span></label
         >
         <textarea
           id="description"
           v-model="homework.description"
           required
           maxlength="1000"
+          rows="4"
+          placeholder="Aprakstiet uzdevumu šeit..."
           :disabled="isLoading"
         ></textarea>
         <small>Līdz 1000 rakstzīmēm.</small>
@@ -95,7 +103,8 @@
 
       <div class="form-group">
         <label for="dueDate"
-          >Izpildes termiņš: <span class="required-field">*</span></label
+          ><i class="fas fa-calendar-check form-icon"></i> Izpildes termiņš:
+          <span class="required-field">*</span></label
         >
         <input
           type="date"
@@ -107,42 +116,55 @@
         />
       </div>
 
+      <hr class="form-divider" />
+      <h3 class="form-section-title">
+        <i class="fas fa-paperclip"></i> Papildus Informācija un Resursi
+      </h3>
+
       <div class="form-group">
         <label for="additionalInfo"
-          >Papildus informācija (norādīts mutiski, u.c.):</label
+          ><i class="fas fa-info-circle form-icon"></i> Papildus informācija
+          (mutiski norādīts, u.c.):</label
         >
         <textarea
           id="additionalInfo"
           v-model="homework.additionalInfo"
+          rows="3"
+          placeholder="Jebkādas papildu piezīmes vai norādes..."
           :disabled="isLoading"
         ></textarea>
       </div>
 
       <div class="form-group">
-        <label for="links">Saites uz nepieciešamajiem resursiem:</label>
+        <label for="links"
+          ><i class="fas fa-link form-icon"></i> Saites uz resursiem:</label
+        >
         <textarea
           id="links"
           v-model="homework.links"
-          placeholder="Katra saite jaunā rindā"
+          rows="3"
+          placeholder="Katra saite jaunā rindā, piem., https://example.com"
           :disabled="isLoading"
         ></textarea>
-        <small>Piemēram: https://example.com/resource1</small>
       </div>
 
       <div class="form-group">
-        <label for="files">Faili (līdz 5 failiem, katrs līdz 5MB):</label>
+        <label for="files"
+          ><i class="fas fa-folder-open form-icon"></i> Pievienot Failus (līdz 5
+          failiem, katrs līdz 5MB):</label
+        >
         <input
           type="file"
           id="files"
           @change="handleFileUpload"
           multiple
           :disabled="isLoading"
-          accept=".pdf,.doc,.docx,.zip,image/*,.txt,.ppt,.pptx,.xls,.xlsx"
+          accept=".pdf,.doc,.docx,.zip,image/*,.txt,.ppt,.pptx,.xls,.xlsx,.rar"
+          class="file-input-styled"
         />
-        <small v-if="!itemIdToEdit">Pievienojiet jaunus failus.</small>
-        <small v-if="itemIdToEdit"
-          >Pievienojot jaunus failus, tie aizstās esošos. Lai dzēstu visus
-          failus, atzīmējiet zemāk.</small
+        <small v-if="itemIdToEdit" class="info-text"
+          ><i class="fas fa-info-circle"></i> Pievienojot jaunus failus, tie
+          aizstās esošos.</small
         >
 
         <div
@@ -152,58 +174,78 @@
             homework.existingFileAttachments.length > 0 &&
             !newFilesSelected
           "
-          class="existing-files-info"
+          class="existing-files-display"
         >
-          <strong>Esošie faili:</strong>
-          <ul>
+          <strong><i class="fas fa-archive"></i> Esošie faili:</strong>
+          <ul class="file-list">
             <li
               v-for="(file, index) in homework.existingFileAttachments"
               :key="index"
+              class="file-list-item existing"
             >
-              {{ file.originalName }} ({{ (file.size / 1024).toFixed(2) }} KB)
+              <i class="fas fa-file"></i> {{ file.originalName }}
+              <span class="file-size"
+                >({{ (file.size / 1024).toFixed(2) }} KB)</span
+              >
             </li>
           </ul>
-          <label
+          <label class="clear-files-label"
             ><input
               type="checkbox"
               v-model="clearExistingFiles"
               :disabled="isLoading"
             />
-            Dzēst visus esošos failus (ja nepievienojat jaunus)</label
+            Dzēst visus esošos failus</label
           >
         </div>
 
-        <ul v-if="homework.selectedFileObjects.length > 0" class="file-list">
-          <li
-            v-for="(file, index) in homework.selectedFileObjects"
-            :key="index"
+        <div
+          v-if="homework.selectedFileObjects.length > 0"
+          class="selected-files-display"
+        >
+          <strong
+            ><i class="fas fa-folder-plus"></i> Atlasītie jaunie faili:</strong
           >
-            {{ file.name }} ({{ (file.size / 1024).toFixed(2) }} KB)
-          </li>
-        </ul>
+          <ul class="file-list">
+            <li
+              v-for="(file, index) in homework.selectedFileObjects"
+              :key="index"
+              class="file-list-item new"
+            >
+              <i class="fas fa-file-medical"></i> {{ file.name }}
+              <span class="file-size"
+                >({{ (file.size / 1024).toFixed(2) }} KB)</span
+              >
+            </li>
+          </ul>
+        </div>
       </div>
 
       <div v-if="successMessage" class="success-message">
-        {{ successMessage }}
+        <i class="fas fa-check-circle"></i> {{ successMessage }}
       </div>
-      <div v-if="errorMessage" class="error-message">{{ errorMessage }}</div>
+      <div v-if="errorMessage" class="error-message">
+        <i class="fas fa-exclamation-triangle"></i> {{ errorMessage }}
+      </div>
 
       <div class="form-actions">
         <button
           v-if="itemIdToEdit"
           type="button"
           @click="cancelEdit"
-          class="action-button secondary-action"
+          class="action-button secondary-button"
           :disabled="isLoading"
         >
-          Atcelt
+          <i class="fas fa-times"></i> Atcelt
         </button>
-        <span></span>
+        <span v-else></span>
+        <!-- Spacer for alignment -->
         <button
           type="submit"
-          class="action-button"
+          class="action-button primary-button"
           :disabled="isLoading || !canAddOrEditLogic"
         >
+          <i :class="itemIdToEdit ? 'fas fa-save' : 'fas fa-plus-circle'"></i>
           {{
             isLoading
               ? itemIdToEdit
@@ -220,6 +262,8 @@
 </template>
 
 <script>
+// Script section remains largely the same as provided in the previous step
+// Only minor adjustments for consistency if needed
 import axios from "axios";
 
 export default {
@@ -234,7 +278,7 @@ export default {
       required: true,
     },
   },
-  inject: ["refreshUser"], // Inject the refresh method from App.vue
+  inject: ["refreshUser"],
   data() {
     const now = new Date();
     const year = now.getFullYear();
@@ -259,7 +303,7 @@ export default {
       isLoadingInitialData: false,
       newFilesSelected: false,
       clearExistingFiles: false,
-      allSystemGroups: [], // For admin to select from
+      allSystemGroups: [],
     };
   },
   computed: {
@@ -271,9 +315,8 @@ export default {
       return this.currentUser.enrolledCustomGroupsDetails || [];
     },
     canAddOrEditLogic() {
-      // Renamed from canAddOrEdit to avoid conflict with potential method
       if (!this.currentUser) return false;
-      if (this.itemIdToEdit) return true; // Can always attempt to edit if ID provided
+      if (this.itemIdToEdit) return true;
 
       if (this.currentUser.role === "admin") {
         return this.allSystemGroups.length > 0;
@@ -311,19 +354,11 @@ export default {
     },
   },
   watch: {
-    // Watch for itemIdToEdit changes after initial mount
     itemIdToEdit(newVal, oldVal) {
       if (newVal !== oldVal && !this.isLoadingInitialData) {
-        // Avoid running during initial mount if already handled
         this.handleIdOrUserChange();
       }
     },
-    // Watch for currentUser changes after initial mount (e.g., unlikely, but for robustness)
-    // currentUser(newVal, oldVal) {
-    //   if (newVal && newVal.id !== oldVal?.id && !this.isLoadingInitialData) {
-    //      this.handleIdOrUserChange();
-    //   }
-    // }
   },
   async mounted() {
     await this.performInitialSetup();
@@ -334,9 +369,8 @@ export default {
       this.errorMessage = "";
       try {
         if (this.refreshUser) {
-          await this.refreshUser(); // Ensures App.vue's currentUser is fresh
+          await this.refreshUser();
         }
-        // currentUser prop is now updated
         await this.handleIdOrUserChange();
       } catch (error) {
         console.error("Error during initial setup of AddHomeworkView:", error);
@@ -347,8 +381,6 @@ export default {
       }
     },
     async handleIdOrUserChange() {
-      // This method is called after currentUser is fresh.
-      // It fetches additional data (like all groups for admin) and sets up the form.
       if (this.currentUser && this.currentUser.role === "admin") {
         await this.fetchAllSystemGroups();
       }
@@ -360,9 +392,7 @@ export default {
       }
     },
     async fetchAllSystemGroups() {
-      // Formerly part of fetchRequiredDataForForm
       if (this.currentUser && this.currentUser.role === "admin") {
-        // Only fetch if not already loaded or if a refresh is needed
         if (this.allSystemGroups.length > 0 && !this.itemIdToEdit) {
           /* simple cache */
         }
@@ -373,7 +403,6 @@ export default {
         } catch (error) {
           console.error("Error fetching all groups for admin:", error);
           this.errorMessage = "Kļūda ielādējot grupu sarakstu administratoram.";
-          // Potentially re-throw or handle more gracefully
         }
       }
     },
@@ -397,15 +426,12 @@ export default {
       };
       this.newFilesSelected = false;
       this.clearExistingFiles = false;
-      // Do not clear general errorMessage here as it might be from initial load
-      // this.errorMessage = "";
       this.successMessage = "";
       const fileInput = document.getElementById("files");
       if (fileInput) fileInput.value = null;
     },
     async loadHomeworkForEditing(itemId) {
-      this.isLoading = true; // Use general isLoading for item-specific loading
-      // this.errorMessage = ""; // Keep existing error messages if any from parent loading
+      this.isLoading = true;
       this.successMessage = "";
       try {
         const response = await axios.get(`/api/homework/${itemId}`);
@@ -429,7 +455,7 @@ export default {
         this.errorMessage =
           error.response?.data?.msg ||
           "Kļūda ielādējot mājasdarba datus rediģēšanai. " +
-            (this.errorMessage || ""); // Append to existing errors
+            (this.errorMessage || "");
         if (error.response?.status === 403 || error.response?.status === 404) {
           setTimeout(() => this.$emit("navigateToDashboard"), 2000);
         }
@@ -450,7 +476,14 @@ export default {
     handleFileUpload(event) {
       this.homework.selectedFileObjects = Array.from(event.target.files);
       this.newFilesSelected = this.homework.selectedFileObjects.length > 0;
-      this.errorMessage = ""; // Clear file-specific errors
+      // Keep existing general error message, but clear file-specific ones.
+      if (
+        this.errorMessage &&
+        (this.errorMessage.startsWith("Jūs varat") ||
+          this.errorMessage.startsWith("Fails"))
+      ) {
+        this.errorMessage = "";
+      }
       this.successMessage = "";
 
       const MAX_TOTAL_FILES = 5;
@@ -472,12 +505,11 @@ export default {
             event.target.value = null;
             this.newFilesSelected = false;
           }
-          return; // Stop on first oversized file
+          return;
         }
       }
     },
     validateClientSideForm() {
-      // Clear only submission-related error message
       if (
         (this.errorMessage && this.errorMessage.startsWith("Lūdzu")) ||
         this.errorMessage.startsWith("Saite")
@@ -534,7 +566,6 @@ export default {
       if (!this.validateClientSideForm()) return;
 
       this.isLoading = true;
-      // Clear only form-specific error messages before submission attempt
       if (
         this.errorMessage &&
         (this.errorMessage.startsWith("Lūdzu") ||
@@ -584,9 +615,10 @@ export default {
             ? "Mājasdarbs veiksmīgi atjaunināts!"
             : "Mājasdarbs veiksmīgi pievienots!");
 
+        const previousCustomGroupId = this.homework.customGroupId; // Save before reset
         if (!this.itemIdToEdit) {
-          const previousCustomGroupId = this.homework.customGroupId;
           this.resetForm();
+          // Restore customGroupId if it's still valid
           if (
             this.availableCustomGroups.some(
               (g) => g._id === previousCustomGroupId
@@ -596,7 +628,6 @@ export default {
           }
         }
 
-        // Delay navigation to allow user to see success message
         setTimeout(() => {
           this.$emit("itemActionSuccess", this.successMessage);
         }, 1500);
@@ -608,7 +639,10 @@ export default {
           error.response ? error.response.data : error
         );
       } finally {
-        this.isLoading = false;
+        if (this.errorMessage) {
+          this.isLoading = false;
+        }
+        // If success, isLoading will be handled by navigation/timeout
       }
     },
   },
@@ -616,49 +650,146 @@ export default {
 </script>
 
 <style scoped>
+/* .add-homework-view inherits .form-view and .card-style from global */
+.view-title {
+  color: var(--header-bg-color);
+  margin: 0 0 1.5rem 0;
+  font-size: 1.8rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
+.form-icon {
+  margin-right: 0.5em;
+  color: var(--primary-color);
+  opacity: 0.7;
+}
+
+.form-divider {
+  margin-top: 2rem;
+  margin-bottom: 1.5rem;
+  border: 0;
+  border-top: 1px solid var(--border-color);
+}
+.form-section-title {
+  font-size: 1.1rem;
+  color: var(--header-bg-color);
+  margin-bottom: 1rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.form-section-title .fas {
+  color: var(--secondary-color);
+}
+
+.file-input-styled {
+  /* Can add custom styling for file input if browser defaults are not desired */
+  /* For example, using ::file-selector-button pseudo-element */
+}
+
+.existing-files-display,
+.selected-files-display {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background-color: #f8f9fa; /* Light background for file list areas */
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+}
+.existing-files-display strong,
+.selected-files-display strong {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+  color: var(--text-color);
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.existing-files-display strong .fas,
+.selected-files-display strong .fas {
+  color: var(--secondary-color);
+}
+
 .file-list {
   list-style-type: none;
   padding-left: 0;
-  margin-top: 10px;
+  margin-top: 0.5rem;
 }
-.file-list li {
-  background-color: #f9f9f9;
-  border: 1px solid #eee;
-  padding: 5px 10px;
-  border-radius: 4px;
-  margin-bottom: 5px;
+.file-list-item {
+  background-color: var(--card-bg-color);
+  border: 1px solid #e9ecef;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--border-radius);
+  margin-bottom: 0.3rem;
   font-size: 0.9em;
-  color: #555;
-}
-.existing-files-info {
-  margin-top: 10px;
-  padding: 10px;
-  background-color: #e9ecef;
-  border-radius: 4px;
-  font-size: 0.9em;
-}
-.existing-files-info ul {
-  margin-top: 5px;
-  margin-bottom: 10px;
-  padding-left: 20px;
-}
-.existing-files-info label {
-  font-weight: normal;
+  color: #495057;
   display: flex;
   align-items: center;
+  gap: 0.5rem;
 }
-.existing-files-info input[type="checkbox"] {
-  margin-right: 5px;
+.file-list-item .fas {
+  color: var(--primary-color);
 }
-.secondary-action {
-  background-color: #6c757d;
+.file-list-item.existing .fas {
+  color: var(--info-color);
 }
-.secondary-action:hover {
-  background-color: #5a6268;
+.file-list-item.new .fas {
+  color: var(--success-color);
 }
-.loading-message {
-  text-align: center;
-  padding: 20px;
-  color: #555;
+.file-size {
+  font-size: 0.85em;
+  color: #6c757d;
+  margin-left: auto; /* Pushes size to the right */
+}
+
+.clear-files-label {
+  display: flex;
+  align-items: center;
+  margin-top: 0.75rem;
+  font-size: 0.9em;
+  color: var(--text-color);
+}
+.clear-files-label input[type="checkbox"] {
+  margin-right: 0.5rem;
+  width: 15px;
+  height: 15px;
+}
+
+.info-text {
+  /* For small informative texts under inputs/selects */
+  display: flex !important;
+  align-items: center;
+  gap: 0.3rem;
+  font-style: italic;
+}
+.info-text .fas {
+  font-size: 0.9em; /* Slightly smaller icon */
+}
+
+.success-message .fas,
+.error-message .fas {
+  margin-right: 0.5em;
+}
+
+.form-actions {
+  justify-content: space-between;
+}
+
+@media (max-width: 600px) {
+  .form-actions {
+    flex-direction: column-reverse;
+  }
+  .form-actions .action-button {
+    width: 100%;
+  }
+  .form-actions .secondary-button {
+    margin-bottom: 0.75rem;
+  }
 }
 </style>

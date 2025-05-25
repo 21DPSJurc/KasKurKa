@@ -1,13 +1,15 @@
 <template>
-  <div class="form-view add-test-view">
+  <div class="form-view add-test-view card-style">
     <button
       @click="handleBackNavigation"
       class="back-button"
-      :disabled="isLoading"
+      :disabled="isLoading || isLoadingInitialData"
     >
-      ← {{ itemIdToEdit ? "Atpakaļ uz Sarakstu" : "Atpakaļ uz Paneli" }}
+      <i class="fas fa-arrow-left"></i>
+      {{ itemIdToEdit ? "Atpakaļ uz Sarakstu" : "Atpakaļ uz Paneli" }}
     </button>
-    <h2>
+    <h2 class="view-title">
+      <i :class="itemIdToEdit ? 'fas fa-edit' : 'fas fa-calendar-plus'"></i>
       {{
         itemIdToEdit
           ? "Rediģēt Pārbaudes Darbu"
@@ -15,11 +17,11 @@
       }}
     </h2>
 
-    <div v-if="isLoadingInitialData" class="loading-message">
-      Notiek datu ielāde...
+    <div v-if="isLoadingInitialData" class="loading-indicator">
+      <i class="fas fa-spinner fa-spin"></i> Notiek datu ielāde...
     </div>
     <div v-else-if="!canAddOrEditLogic" class="error-message">
-      {{ addEditNotAllowedMessage }}
+      <i class="fas fa-exclamation-triangle"></i> {{ addEditNotAllowedMessage }}
     </div>
 
     <form
@@ -29,8 +31,8 @@
     >
       <div class="form-group">
         <label for="customGroupIdTest"
-          >Grupa (kam redzams pārbaudes darbs):
-          <span class="required-field">*</span></label
+          ><i class="fas fa-users form-icon"></i> Grupa (kam redzams pārbaudes
+          darbs): <span class="required-field">*</span></label
         >
         <select
           id="customGroupIdTest"
@@ -53,9 +55,9 @@
             currentUser.role === 'student' &&
             availableCustomGroups.length === 0
           "
-          >Jums jābūt vismaz vienas grupas dalībniekam, lai pievienotu pārbaudes
-          darbu. Mēģiniet vēlreiz ielādēt lapu vai sazinieties ar
-          administratoru, ja nesen tikāt pievienots jaunai grupai.</small
+          class="info-text"
+          ><i class="fas fa-info-circle"></i> Jums jābūt vismaz vienas grupas
+          dalībniekam.</small
         >
         <small
           v-if="
@@ -63,13 +65,16 @@
             currentUser.role === 'admin' &&
             availableCustomGroups.length === 0
           "
-          >Nav pieejamu grupu sistēmā. Lūdzu, izveidojiet grupu vispirms.</small
+          class="info-text"
+          ><i class="fas fa-info-circle"></i> Nav pieejamu grupu sistēmā. Lūdzu,
+          izveidojiet grupu.</small
         >
       </div>
 
       <div class="form-group">
         <label for="subject"
-          >Mācību priekšmets: <span class="required-field">*</span></label
+          ><i class="fas fa-book form-icon"></i> Mācību priekšmets:
+          <span class="required-field">*</span></label
         >
         <input
           type="text"
@@ -77,42 +82,57 @@
           v-model="test.subject"
           required
           maxlength="50"
+          placeholder="Piem., Latviešu valoda"
           :disabled="isLoading"
         />
         <small>Līdz 50 rakstzīmēm.</small>
       </div>
 
+      <div class="form-row">
+        <div class="form-group half-width">
+          <label for="eventDate"
+            ><i class="fas fa-calendar-alt form-icon"></i> Norises datums:
+            <span class="required-field">*</span></label
+          >
+          <input
+            type="date"
+            id="eventDate"
+            v-model="test.eventDate"
+            required
+            :min="today"
+            :disabled="isLoading"
+          />
+        </div>
+
+        <div class="form-group half-width">
+          <label for="eventTime"
+            ><i class="fas fa-clock form-icon"></i> Norises laiks:</label
+          >
+          <input
+            type="time"
+            id="eventTime"
+            v-model="test.eventTime"
+            :disabled="isLoading"
+          />
+          <small>Piemēram, 10:00</small>
+        </div>
+      </div>
+
+      <hr class="form-divider" />
+      <h3 class="form-section-title">
+        <i class="fas fa-info-circle"></i> Detalizētāka Informācija
+      </h3>
+
       <div class="form-group">
-        <label for="eventDate"
-          >Norises datums: <span class="required-field">*</span></label
+        <label for="topics"
+          ><i class="fas fa-tasks form-icon"></i> Pārbaudes darba
+          tēmas/apraksts:</label
         >
-        <input
-          type="date"
-          id="eventDate"
-          v-model="test.eventDate"
-          required
-          :min="today"
-          :disabled="isLoading"
-        />
-      </div>
-
-      <div class="form-group">
-        <label for="eventTime">Norises laiks:</label>
-        <input
-          type="time"
-          id="eventTime"
-          v-model="test.eventTime"
-          :disabled="isLoading"
-        />
-        <small>Piemēram, 10:00</small>
-      </div>
-
-      <div class="form-group">
-        <label for="topics">Pārbaudes darba tēmas/apraksts:</label>
         <textarea
           id="topics"
           v-model="test.topics"
-          placeholder="Piemēram: Funkcijas, Masīvi, Klases. Līdz 1000 rakstzīmēm."
+          rows="4"
+          placeholder="Piemēram: Komati, Pieturzīmes teikuma beigās. Līdz 1000 rakstzīmēm."
           maxlength="1000"
           :disabled="isLoading"
         ></textarea>
@@ -120,46 +140,59 @@
       </div>
 
       <div class="form-group">
-        <label for="format">Formāts:</label>
+        <label for="format"
+          ><i class="fas fa-pencil-ruler form-icon"></i> Formāts:</label
+        >
         <input
           type="text"
           id="format"
           v-model="test.format"
           placeholder="Piemēram: tests, eseja, prezentācija"
+          maxlength="50"
           :disabled="isLoading"
         />
+        <small>Līdz 50 rakstzīmēm.</small>
       </div>
 
       <div class="form-group">
-        <label for="additionalInfo">Cita būtiska informācija:</label>
+        <label for="additionalInfo"
+          ><i class="fas fa-comment-dots form-icon"></i> Cita būtiska
+          informācija:</label
+        >
         <textarea
           id="additionalInfo"
           v-model="test.additionalInfo"
+          rows="3"
+          placeholder="Jebkādas papildu piezīmes vai norādes..."
           :disabled="isLoading"
         ></textarea>
       </div>
 
       <div v-if="successMessage" class="success-message">
-        {{ successMessage }}
+        <i class="fas fa-check-circle"></i> {{ successMessage }}
       </div>
-      <div v-if="errorMessage" class="error-message">{{ errorMessage }}</div>
+      <div v-if="errorMessage" class="error-message">
+        <i class="fas fa-exclamation-triangle"></i> {{ errorMessage }}
+      </div>
 
       <div class="form-actions">
         <button
           v-if="itemIdToEdit"
           type="button"
           @click="cancelEdit"
-          class="action-button secondary-action"
+          class="action-button secondary-button"
           :disabled="isLoading"
         >
-          Atcelt
+          <i class="fas fa-times"></i> Atcelt
         </button>
-        <span></span>
+        <span v-else></span>
+        <!-- Spacer -->
         <button
           type="submit"
-          class="action-button"
+          class="action-button primary-button"
           :disabled="isLoading || !canAddOrEditLogic"
         >
+          <i :class="itemIdToEdit ? 'fas fa-save' : 'fas fa-plus-circle'"></i>
           {{
             isLoading
               ? itemIdToEdit
@@ -176,6 +209,7 @@
 </template>
 
 <script>
+// Script section remains largely the same as provided in the previous step
 import axios from "axios";
 
 export default {
@@ -190,7 +224,7 @@ export default {
       required: true,
     },
   },
-  inject: ["refreshUser"], // Inject the refresh method from App.vue
+  inject: ["refreshUser"],
   data() {
     const now = new Date();
     const year = now.getFullYear();
@@ -202,7 +236,7 @@ export default {
         subject: "",
         eventDate: `${year}-${month}-${day}`,
         eventTime: "",
-        topics: "", // This can serve as 'description' for tests
+        topics: "",
         format: "",
         additionalInfo: "",
         customGroupId: "",
@@ -224,7 +258,6 @@ export default {
       return this.currentUser.enrolledCustomGroupsDetails || [];
     },
     canAddOrEditLogic() {
-      // Renamed from canAddOrEdit
       if (!this.currentUser) return false;
       if (this.itemIdToEdit) return true;
 
@@ -269,11 +302,6 @@ export default {
         this.handleIdOrUserChange();
       }
     },
-    // currentUser(newVal, oldVal) {
-    //    if (newVal && newVal.id !== oldVal?.id && !this.isLoadingInitialData) {
-    //     this.handleIdOrUserChange();
-    //   }
-    // }
   },
   async mounted() {
     await this.performInitialSetup();
@@ -337,12 +365,10 @@ export default {
             ? this.availableCustomGroups[0]._id
             : "",
       };
-      // this.errorMessage = "";
       this.successMessage = "";
     },
     async loadTestForEditing(itemId) {
       this.isLoading = true;
-      // this.errorMessage = "";
       this.successMessage = "";
       try {
         const response = await axios.get(`/api/tests/${itemId}`);
@@ -405,10 +431,13 @@ export default {
           "Mācību priekšmeta nosaukums nedrīkst pārsniegt 50 rakstzīmes.";
         return false;
       }
-      // 'topics' field serves as description for tests.
       if (this.test.topics && this.test.topics.trim().length > 1000) {
         this.errorMessage =
           "Pārbaudes darba tēmas/apraksts nedrīkst pārsniegt 1000 rakstzīmes.";
+        return false;
+      }
+      if (this.test.format && this.test.format.trim().length > 50) {
+        this.errorMessage = "Formāta lauks nedrīkst pārsniegt 50 rakstzīmes.";
         return false;
       }
       if (!this.test.eventDate) {
@@ -458,9 +487,10 @@ export default {
             ? "Pārbaudes darbs veiksmīgi atjaunināts!"
             : "Pārbaudes darbs veiksmīgi pievienots!");
 
+        const previousCustomGroupId = this.test.customGroupId; // Save before reset
         if (!this.itemIdToEdit) {
-          const previousCustomGroupId = this.test.customGroupId;
           this.resetForm();
+          // Restore customGroupId if it's still valid
           if (
             this.availableCustomGroups.some(
               (g) => g._id === previousCustomGroupId
@@ -481,7 +511,10 @@ export default {
           error.response ? error.response.data : error
         );
       } finally {
-        this.isLoading = false;
+        if (this.errorMessage) {
+          this.isLoading = false;
+        }
+        // If success, isLoading will be handled by navigation/timeout
       }
     },
   },
@@ -489,15 +522,91 @@ export default {
 </script>
 
 <style scoped>
-.secondary-action {
-  background-color: #6c757d;
+/* .add-test-view inherits .form-view and .card-style from global */
+.view-title {
+  color: var(--header-bg-color);
+  margin: 0 0 1.5rem 0;
+  font-size: 1.8rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
 }
-.secondary-action:hover {
-  background-color: #5a6268;
+
+.form-icon {
+  margin-right: 0.5em;
+  color: var(--primary-color);
+  opacity: 0.7;
 }
-.loading-message {
-  text-align: center;
-  padding: 20px;
-  color: #555;
+
+.form-row {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.25rem; /* Same as .form-group */
+}
+.form-group.half-width {
+  flex: 1;
+  min-width: 0; /* Allows flex items to shrink properly */
+  margin-bottom: 0; /* Margin is on .form-row now */
+}
+
+.form-divider {
+  margin-top: 2rem;
+  margin-bottom: 1.5rem;
+  border: 0;
+  border-top: 1px solid var(--border-color);
+}
+.form-section-title {
+  font-size: 1.1rem;
+  color: var(--header-bg-color);
+  margin-bottom: 1rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.form-section-title .fas {
+  color: var(--secondary-color);
+}
+
+.info-text {
+  /* For small informative texts under inputs/selects */
+  display: flex !important;
+  align-items: center;
+  gap: 0.3rem;
+  font-style: italic;
+}
+.info-text .fas {
+  font-size: 0.9em;
+}
+
+.success-message .fas,
+.error-message .fas {
+  margin-right: 0.5em;
+}
+
+.form-actions {
+  justify-content: space-between;
+}
+
+@media (max-width: 600px) {
+  .form-row {
+    flex-direction: column;
+    gap: 0;
+    margin-bottom: 0;
+  }
+  .form-group.half-width {
+    margin-bottom: 1.25rem;
+  }
+  .form-actions {
+    flex-direction: column-reverse;
+  }
+  .form-actions .action-button {
+    width: 100%;
+  }
+  .form-actions .secondary-button {
+    margin-bottom: 0.75rem;
+  }
 }
 </style>

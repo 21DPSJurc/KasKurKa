@@ -1,99 +1,127 @@
 <template>
-  <div class="dashboard-view">
-    <header class="dashboard-header">
-      <h2>Mājasdarbu Panelis</h2>
-      <button @click="logout" class="action-button logout-button">Iziet</button>
+  <div class="dashboard-view card-style">
+    <header class="dashboard-view-header">
+      <div class="header-content">
+        <h2 class="view-title">
+          <i class="fas fa-tachometer-alt"></i> Mans Panelis
+        </h2>
+        <button
+          @click="logout"
+          class="action-button danger-button logout-button"
+        >
+          <i class="fas fa-sign-out-alt"></i> Iziet
+        </button>
+      </div>
     </header>
-    <section class="dashboard-content">
+
+    <section class="dashboard-intro">
       <p>
-        Laipni lūgti KasKurKa sistēmā! Pārvaldiet savus mājasdarbus, pārbaudes
-        darbus un grupas šeit.
+        Sveicināti KasKurKa! Šeit jūs varat ērti pārvaldīt savus mācību darbus,
+        sekot līdzi termiņiem un sadarboties ar kursabiedriem.
       </p>
+    </section>
 
-      <nav class="dashboard-actions">
-        <button class="action-button" @click="navigateToAddHomework">
-          Pievienot Mājasdarbu (2.2.3)
-        </button>
-        <button class="action-button" @click="navigateToAddTest">
-          Pievienot Pārbaudes Darbu (2.2.4)
-        </button>
-        <button class="action-button" @click="navigateToHomeworkList">
-          Skatīt Sarakstu (2.2.5)
-        </button>
-        <button class="action-button" @click="navigateToGroupList">
-          Skatīt/Pievienoties Grupām
-        </button>
-      </nav>
+    <nav class="dashboard-actions">
+      <button class="action-button" @click="navigateToAddHomework">
+        <i class="fas fa-plus-circle"></i> Pievienot Mājasdarbu
+      </button>
+      <button class="action-button" @click="navigateToAddTest">
+        <i class="fas fa-calendar-plus"></i> Pievienot Pārbaudes Darbu
+      </button>
+      <button class="action-button" @click="navigateToHomeworkList">
+        <i class="fas fa-list-ul"></i> Visi Darbi
+      </button>
+      <button class="action-button" @click="navigateToGroupList">
+        <i class="fas fa-users"></i> Manas Grupas
+      </button>
+    </nav>
 
-      <!-- Upcoming Items Panel -->
-      <section class="upcoming-items-panel">
-        <div v-if="isLoadingItems" class="loading-message">
-          <p>Notiek aktuālo darbu ielāde...</p>
+    <hr class="section-divider" />
+
+    <!-- Upcoming Items Panel -->
+    <section class="upcoming-items-panel">
+      <h3 class="panel-title"><i class="fas fa-bell"></i> Tuvākie Notikumi</h3>
+      <div v-if="isLoadingItems" class="loading-indicator">
+        <i class="fas fa-spinner fa-spin"></i> Notiek aktuālo darbu ielāde...
+      </div>
+      <div v-if="fetchError" class="error-message">{{ fetchError }}</div>
+
+      <div
+        v-if="!isLoadingItems && !fetchError"
+        class="upcoming-columns-container"
+      >
+        <div class="upcoming-column card-style-inner">
+          <h4>
+            <i class="fas fa-book-reader icon-homework"></i> Tuvākie Mājasdarbi
+          </h4>
+          <ul v-if="upcomingHomeworks.length > 0" class="upcoming-list">
+            <li
+              v-for="hw in upcomingHomeworks"
+              :key="hw._id"
+              class="upcoming-item homework-item"
+              @click="navigateToItemDetails(hw._id, 'homework')"
+              title="Skatīt mājasdarba detaļas"
+            >
+              <span class="item-subject">{{ hw.subject }}</span>
+              <span class="item-date">
+                <i class="fas fa-calendar-alt"></i> Termiņš:
+                {{ formatDate(hw.dueDate) }}
+              </span>
+              <span class="item-group">
+                <i class="fas fa-layer-group"></i>
+                {{ hw.customGroupName || "Nezināma grupa" }}
+              </span>
+            </li>
+          </ul>
+          <p v-else class="no-items-message">
+            <i class="fas fa-folder-open"></i> Nav tuvāko mājasdarbu.
+          </p>
         </div>
-        <div v-if="fetchError" class="error-message">{{ fetchError }}</div>
 
-        <div
-          v-if="!isLoadingItems && !fetchError"
-          class="upcoming-columns-container"
+        <div class="upcoming-column card-style-inner">
+          <h4>
+            <i class="fas fa-feather-alt icon-test"></i> Tuvākie Pārbaudes Darbi
+          </h4>
+          <ul v-if="upcomingTests.length > 0" class="upcoming-list">
+            <li
+              v-for="test in upcomingTests"
+              :key="test._id"
+              class="upcoming-item test-item"
+              @click="navigateToItemDetails(test._id, 'test')"
+              title="Skatīt pārbaudes darba detaļas"
+            >
+              <span class="item-subject">{{ test.subject }}</span>
+              <span class="item-date">
+                <i class="fas fa-calendar-check"></i> Norise:
+                {{ formatDate(test.eventDate)
+                }}{{ test.eventTime ? ", " + test.eventTime : "" }}
+              </span>
+              <span class="item-group">
+                <i class="fas fa-layer-group"></i>
+                {{ test.customGroupName || "Nezināma grupa" }}
+              </span>
+            </li>
+          </ul>
+          <p v-else class="no-items-message">
+            <i class="fas fa-folder-open"></i> Nav tuvāko pārbaudes darbu.
+          </p>
+        </div>
+      </div>
+      <div
+        v-if="
+          !isLoadingItems &&
+          !fetchError &&
+          (upcomingHomeworks.length > 0 || upcomingTests.length > 0)
+        "
+        class="view-all-link-container"
+      >
+        <button
+          class="action-button secondary-button"
+          @click="navigateToHomeworkList"
         >
-          <div class="upcoming-column">
-            <h4>
-              <i class="fas fa-book-reader icon-homework"></i> Tuvākie
-              Mājasdarbi
-            </h4>
-            <ul v-if="upcomingHomeworks.length > 0" class="upcoming-list">
-              <li
-                v-for="hw in upcomingHomeworks"
-                :key="hw._id"
-                class="upcoming-item homework-item"
-              >
-                <span class="item-subject">{{ hw.subject }}</span>
-                <span class="item-date"
-                  >Termiņš: {{ formatDate(hw.dueDate) }}</span
-                >
-                <span class="item-group">Grupa: {{ hw.customGroupName }}</span>
-              </li>
-            </ul>
-            <p v-else class="no-items-message">Nav tuvāko mājasdarbu.</p>
-          </div>
-
-          <div class="upcoming-column">
-            <h4>
-              <i class="fas fa-feather-alt icon-test"></i> Tuvākie Pārbaudes
-              Darbi
-            </h4>
-            <ul v-if="upcomingTests.length > 0" class="upcoming-list">
-              <li
-                v-for="test in upcomingTests"
-                :key="test._id"
-                class="upcoming-item test-item"
-              >
-                <span class="item-subject">{{ test.subject }}</span>
-                <span class="item-date"
-                  >Norise: {{ formatDate(test.eventDate)
-                  }}{{ test.eventTime ? ", " + test.eventTime : "" }}</span
-                >
-                <span class="item-group"
-                  >Grupa: {{ test.customGroupName }}</span
-                >
-              </li>
-            </ul>
-            <p v-else class="no-items-message">Nav tuvāko pārbaudes darbu.</p>
-          </div>
-        </div>
-        <div
-          v-if="
-            !isLoadingItems &&
-            !fetchError &&
-            (upcomingHomeworks.length > 0 || upcomingTests.length > 0)
-          "
-          class="view-all-link-container"
-        >
-          <button class="action-button-small" @click="navigateToHomeworkList">
-            Skatīt Visus Darbus Sarakstā
-          </button>
-        </div>
-      </section>
+          <i class="fas fa-eye"></i> Skatīt Visus Darbus Sarakstā
+        </button>
+      </div>
     </section>
   </div>
 </template>
@@ -112,7 +140,7 @@ export default {
       upcomingTests: [],
       isLoadingItems: true,
       fetchError: "",
-      MAX_DISPLAY_ITEMS: 3, // Max items to show in each list
+      MAX_DISPLAY_ITEMS: 3,
     };
   },
   methods: {
@@ -158,119 +186,155 @@ export default {
       try {
         return new Date(dateString).toLocaleDateString("lv-LV", options);
       } catch (e) {
-        return dateString;
+        return dateString; // Fallback
       }
+    },
+    navigateToItemDetails(itemId, itemType) {
+      // This implies that App.vue needs a way to show item details,
+      // or HomeworkListView handles showing a single item.
+      // For now, let's assume clicking these items navigates to the full list
+      // where more details can be accessed or individual items clicked.
+      // Or, a new view "ItemDetailView" could be created.
+      // For simplicity, let's navigate to the HomeworkListView and the user can find it there.
+      // A more advanced implementation would pass the itemId and itemType to a detail view.
+      console.log(`Navigate to details for ${itemType} ID: ${itemId}`);
+      this.$emit("navigateToHomeworkList"); // Simplest for now, could be enhanced.
     },
   },
   mounted() {
     this.fetchUpcomingItems();
-    // Font Awesome link - ideally add this to public/index.html head for global use
-    if (!document.getElementById("font-awesome-css")) {
-      const link = document.createElement("link");
-      link.id = "font-awesome-css";
-      link.rel = "stylesheet";
-      link.href =
-        "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css";
-      document.head.appendChild(link);
-    }
   },
 };
 </script>
 
 <style scoped>
 .dashboard-view {
-  max-width: 900px;
-  margin: 0 auto;
-  padding: 20px;
-  background-color: #fff;
-  border-radius: 8px;
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-  text-align: left;
-  width: 100%;
+  /* Inherits .card-style from App.vue global styles */
+  padding: 1.5rem;
 }
-.dashboard-header {
+
+.dashboard-view-header {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+.dashboard-view-header .header-content {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 25px;
-  padding-bottom: 15px;
-  border-bottom: 1px solid #eee;
 }
-.dashboard-header h2 {
-  color: #2c3e50;
+.dashboard-view-header .view-title {
+  color: var(--header-bg-color);
   margin: 0;
+  font-size: 1.8rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
 }
 .logout-button {
-  background-color: #e74c3c;
-  padding: 10px 20px;
+  /* Using global .action-button and specific .danger-button */
 }
-.logout-button:hover {
-  background-color: #c0392b;
+.action-button.danger-button {
+  background-color: var(--danger-color);
+  color: var(--text-color-light);
 }
-.dashboard-content p {
-  font-size: 1.1em;
+.action-button.danger-button:hover:not([disabled]) {
+  background-color: #c82333; /* Darker danger */
+}
+
+.dashboard-intro p {
+  font-size: 1.05rem;
   color: #555;
-  margin-bottom: 20px;
+  margin-bottom: 1.5rem;
+  line-height: 1.7;
+  text-align: center;
 }
+
 .dashboard-actions {
-  margin-bottom: 30px;
-  padding-bottom: 20px;
-  border-bottom: 1px solid #f0f0f0;
+  margin-bottom: 1.5rem;
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 0.75rem; /* Space between buttons */
+  justify-content: center; /* Center buttons */
 }
 .dashboard-actions .action-button {
-  margin: 5px 0;
+  /* Uses global .action-button */
+  flex-grow: 1; /* Allow buttons to grow */
+  min-width: 200px; /* Minimum width for better wrapping */
+  background-color: var(--primary-color); /* Default to primary */
 }
-.dashboard-actions .action-button[disabled] {
-  background-color: #bdc3c7;
-  cursor: not-allowed;
+.dashboard-actions .action-button:nth-child(2) {
+  background-color: var(--info-color);
 }
-.dashboard-actions .action-button[disabled]:hover {
-  background-color: #bdc3c7;
+.dashboard-actions .action-button:nth-child(3) {
+  background-color: var(--success-color);
+}
+.dashboard-actions .action-button:nth-child(4) {
+  background-color: var(--secondary-color);
+}
+
+.dashboard-actions .action-button:hover:not([disabled]) {
+  filter: brightness(110%);
+}
+
+.section-divider {
+  border: 0;
+  height: 1px;
+  background-color: var(--border-color);
+  margin: 2rem 0;
 }
 
 /* Upcoming Items Panel Styles */
 .upcoming-items-panel {
-  margin-top: 30px;
-  padding: 20px;
-  background-color: #f8f9fa; /* Light grey background */
-  border-radius: 8px;
-  border: 1px solid #e9ecef;
+  margin-top: 1.5rem;
 }
+.upcoming-items-panel .panel-title {
+  font-size: 1.5rem;
+  color: var(--header-bg-color);
+  margin-bottom: 1.5rem;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
 .upcoming-columns-container {
   display: flex;
-  flex-wrap: wrap; /* Allow wrapping on smaller screens */
-  gap: 20px;
+  flex-wrap: wrap;
+  gap: 1.5rem; /* Space between columns */
 }
 .upcoming-column {
   flex: 1;
-  min-width: 280px; /* Minimum width before wrapping */
-  background-color: #ffffff;
-  padding: 15px;
-  border-radius: 6px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.07);
+  min-width: 300px; /* Minimum width before wrapping */
 }
+.card-style-inner {
+  /* For cards within the main card */
+  background-color: var(--card-bg-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-sm);
+  padding: 1.25rem;
+  border: 1px solid var(--border-color);
+}
+
 .upcoming-column h4 {
-  color: #34495e;
+  color: var(--header-bg-color);
   margin-top: 0;
-  margin-bottom: 15px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid #ecf0f1;
-  font-size: 1.2em;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 1.25rem; /* Adjusted size */
+  font-weight: 600;
   display: flex;
   align-items: center;
-}
-.upcoming-column h4 .fas {
-  margin-right: 10px;
-  font-size: 1.1em;
+  gap: 0.6rem;
 }
 .icon-homework {
-  color: #3498db; /* Blue for homework */
+  color: var(--primary-color);
 }
 .icon-test {
-  color: #e67e22; /* Orange for tests */
+  color: var(--warning-color);
 }
 
 .upcoming-list {
@@ -279,63 +343,64 @@ export default {
   margin: 0;
 }
 .upcoming-item {
-  padding: 12px;
-  margin-bottom: 10px;
-  border-radius: 4px;
-  border-left-width: 4px;
+  padding: 0.8rem 1rem;
+  margin-bottom: 0.75rem;
+  border-radius: var(--border-radius);
+  border-left-width: 5px;
   border-left-style: solid;
-  background-color: #fdfdfd;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  background-color: #f8f9fa; /* Lighter background for items */
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  cursor: pointer;
+}
+.upcoming-item:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
 }
 .upcoming-item.homework-item {
-  border-left-color: #3498db;
+  border-left-color: var(--primary-color);
 }
 .upcoming-item.test-item {
-  border-left-color: #e67e22;
+  border-left-color: var(--warning-color);
 }
+
 .upcoming-item span {
   display: block;
-  font-size: 0.95em;
+  font-size: 0.95rem;
 }
 .upcoming-item .item-subject {
-  font-weight: bold;
-  color: #2c3e50;
-  margin-bottom: 4px;
+  font-weight: 600;
+  color: var(--text-color);
+  margin-bottom: 0.3rem;
+  font-size: 1.05rem;
 }
-.upcoming-item .item-date {
-  color: #7f8c8d;
-  font-size: 0.9em;
-  margin-bottom: 3px;
-}
+.upcoming-item .item-date,
 .upcoming-item .item-group {
-  color: #2980b9;
-  font-size: 0.85em;
-  font-style: italic;
+  color: #6c757d;
+  font-size: 0.85rem;
+  margin-bottom: 0.2rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
 }
 .no-items-message {
-  color: #777;
+  color: #6c757d;
   font-style: italic;
-  padding: 10px 0;
-}
-.loading-message,
-.error-message {
+  padding: 1rem 0;
   text-align: center;
-  padding: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-size: 0.95rem;
 }
 .view-all-link-container {
   text-align: center;
-  margin-top: 20px;
+  margin-top: 1.5rem;
 }
-.action-button-small {
-  padding: 8px 15px;
-  font-size: 0.9em;
-  border-radius: 4px;
-  cursor: pointer;
-  border: none;
-  color: white;
-  background-color: #3498db;
+.view-all-link-container .action-button {
+  /* Using global .action-button and .secondary-button */
 }
-.action-button-small:hover:not([disabled]) {
-  background-color: #2980b9;
-}
+
+/* Loading and Error messages inherit from global */
 </style>

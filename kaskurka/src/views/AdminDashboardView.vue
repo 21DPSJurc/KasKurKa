@@ -1,43 +1,66 @@
 <template>
-  <div class="admin-dashboard-view form-view">
-    <header class="dashboard-header">
-      <h2>Administratora Panelis</h2>
-      <button @click="logout" class="action-button logout-button">Iziet</button>
+  <div class="admin-dashboard-view card-style">
+    <header class="dashboard-view-header">
+      <div class="header-content">
+        <h2 class="view-title">
+          <i class="fas fa-user-shield"></i> Administratora Panelis
+        </h2>
+        <button
+          @click="logout"
+          class="action-button danger-button logout-button"
+        >
+          <i class="fas fa-sign-out-alt"></i> Iziet
+        </button>
+      </div>
     </header>
-    <section class="dashboard-content">
+
+    <section class="dashboard-intro">
       <p>
         Laipni lūgti Administratora panelī! Šeit jūs varat pārvaldīt sistēmas
-        grupas, lietotājus un citus iestatījumus.
+        grupas, lietotājus, pieteikumus un citus svarīgus iestatījumus.
       </p>
+    </section>
 
-      <nav class="dashboard-actions">
-        <button class="action-button" @click="navigateToCreateGroup">
-          Izveidot Jaunu Grupu (2.2.6)
-        </button>
-        <button class="action-button" @click="navigateToManageGroups">
-          Pārvaldīt Grupas (Rediģēt/Dzēst)
-        </button>
-        <button
-          class="action-button"
-          @click="navigateToManageGroupApplications"
-        >
-          Pārvaldīt Grupu Pieteikumus (2.2.8)
-        </button>
-        <button class="action-button" @click="navigateToManageUsers">
-          Pārvaldīt Lietotājus (8.2, 8.3, 8.4, 8.5)
-        </button>
-        <button
-          class="action-button"
-          @click="navigateToStudentDashboard"
-          title="Pāriet uz studentu skatu, lai redzētu mājasdarbus u.c."
-        >
-          Skatīt kā Students
-        </button>
-      </nav>
+    <nav class="dashboard-actions admin-actions">
+      <button
+        class="action-button admin-action-button"
+        @click="navigateToManageUsers"
+      >
+        <i class="fas fa-users-cog"></i> Pārvaldīt Lietotājus
+      </button>
+      <button
+        class="action-button admin-action-button"
+        @click="navigateToCreateGroup"
+      >
+        <i class="fas fa-plus-square"></i> Izveidot Jaunu Grupu
+      </button>
+      <button
+        class="action-button admin-action-button"
+        @click="navigateToManageGroups"
+      >
+        <i class="fas fa-edit"></i> Pārvaldīt Grupas
+      </button>
+      <button
+        class="action-button admin-action-button"
+        @click="navigateToManageGroupApplications"
+      >
+        <i class="fas fa-tasks"></i> Grupu Pieteikumi
+      </button>
+      <button
+        class="action-button admin-action-button view-as-student-button"
+        @click="navigateToStudentDashboard"
+        title="Pāriet uz studentu skatu, lai redzētu mājasdarbus u.c."
+      >
+        <i class="fas fa-user-graduate"></i> Skatīt kā Students
+      </button>
+    </nav>
 
-      <div class="content-placeholder">
-        <!-- Removed Plānotās Administratora Funkcijas section -->
-      </div>
+    <!-- Placeholder for potential future admin-specific summaries or stats -->
+    <section class="admin-summary-placeholder" v-if="false">
+      <h3 class="panel-title">
+        <i class="fas fa-chart-bar"></i> Sistēmas Pārskats
+      </h3>
+      <p>Šeit varētu būt statistika par lietotājiem, grupām, aktivitāti utt.</p>
     </section>
   </div>
 </template>
@@ -59,7 +82,6 @@ export default {
       this.$emit("navigateToManageGroups");
     },
     navigateToManageUsers() {
-      // New method
       this.$emit("navigateToManageUsers");
     },
     navigateToStudentDashboard() {
@@ -70,76 +92,112 @@ export default {
 </script>
 
 <style scoped>
-/* Most styles are global or re-used from DashboardView.vue */
+/* .admin-dashboard-view inherits .card-style from global */
 .admin-dashboard-view {
-  max-width: 900px; /* Consistent with HomeworkListView */
+  padding: 1.5rem;
 }
-.dashboard-header {
-  /* Copied from DashboardView for consistency */
+
+.dashboard-view-header {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+.dashboard-view-header .header-content {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 25px;
-  padding-bottom: 15px;
-  border-bottom: 1px solid #eee;
 }
-.dashboard-header h2 {
-  color: #2c3e50;
+.dashboard-view-header .view-title {
+  color: var(--header-bg-color);
   margin: 0;
+  font-size: 1.8rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
 }
 .logout-button {
-  /* Copied from DashboardView */
-  background-color: #e74c3c;
-  padding: 10px 20px;
+  /* Uses global .action-button and .danger-button */
 }
-.logout-button:hover {
-  background-color: #c0392b;
+.action-button.danger-button {
+  background-color: var(--danger-color);
+  color: var(--text-color-light);
 }
-.dashboard-content p {
-  /* Copied from DashboardView */
-  font-size: 1.1em;
-  color: #555;
-  margin-bottom: 20px;
+.action-button.danger-button:hover:not([disabled]) {
+  background-color: #c82333; /* Darker danger */
 }
-.dashboard-actions {
-  /* Copied from DashboardView */
-  margin-bottom: 30px;
-  padding-bottom: 20px;
-  border-bottom: 1px solid #f0f0f0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-.dashboard-actions .action-button {
-  margin: 5px 0;
-}
-.content-placeholder {
-  /* Copied from DashboardView */
-  margin-top: 30px;
-  padding: 20px;
-  background-color: #f9f9f9;
-  border: 1px dashed #ddd;
-  border-radius: 5px;
-  /* If it's empty now, you might want to adjust its styling or remove it if not needed */
-  min-height: 50px; /* Example: give it some height if it's just an empty box now */
-}
-/* If the .content-placeholder is now truly empty and not needed,
-   you can remove its styles or even the div itself.
-   For now, I've left it as an empty styled box. */
 
-/* Remove specific styles for h3 and ul if they are no longer present or needed */
-/*
-.content-placeholder h3 {
-  margin-top: 0;
-  color: #34495e;
+.dashboard-intro p {
+  font-size: 1.05rem;
+  color: #555;
+  margin-bottom: 1.5rem;
+  line-height: 1.7;
+  text-align: center;
 }
-.content-placeholder ul {
-  list-style-type: disc;
-  padding-left: 20px;
+
+.admin-actions {
+  display: grid;
+  grid-template-columns: repeat(
+    auto-fit,
+    minmax(250px, 1fr)
+  ); /* Responsive grid */
+  gap: 1rem;
+  margin-bottom: 1.5rem;
 }
-.content-placeholder li {
-  margin-bottom: 8px;
-  color: #7f8c8d;
+
+.admin-action-button {
+  /* Uses global .action-button */
+  background-color: var(--primary-color); /* Default color for admin actions */
+  justify-content: flex-start; /* Align icon and text to the left */
+  padding: 1rem; /* More padding for larger buttons */
+  font-size: 1.05rem;
 }
-*/
+.admin-action-button i {
+  font-size: 1.2em; /* Slightly larger icons */
+  width: 25px; /* Fixed width for icon alignment */
+  text-align: center;
+}
+
+/* Different colors for different admin actions for better visual distinction */
+.admin-actions .admin-action-button:nth-child(1) {
+  background-color: var(--info-color);
+} /* Manage Users */
+.admin-actions .admin-action-button:nth-child(2) {
+  background-color: var(--success-color);
+} /* Create Group */
+.admin-actions .admin-action-button:nth-child(3) {
+  background-color: var(--primary-color);
+} /* Manage Groups */
+.admin-actions .admin-action-button:nth-child(4) {
+  background-color: var(--warning-color);
+  color: var(--text-color);
+} /* Applications - yellow often needs dark text */
+.admin-actions .admin-action-button.view-as-student-button {
+  background-color: var(--secondary-color);
+} /* View as Student */
+
+.admin-actions .admin-action-button:hover:not([disabled]) {
+  filter: brightness(110%);
+}
+
+.admin-summary-placeholder {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  background-color: #f8f9fa;
+  border: 1px dashed var(--border-color);
+  border-radius: var(--border-radius);
+  text-align: center;
+  color: #6c757d;
+}
+.admin-summary-placeholder .panel-title {
+  font-size: 1.3rem;
+  color: var(--header-bg-color);
+  margin-bottom: 1rem;
+}
+
+@media (max-width: 768px) {
+  .admin-actions {
+    grid-template-columns: 1fr; /* Stack buttons on smaller screens */
+  }
+}
 </style>
