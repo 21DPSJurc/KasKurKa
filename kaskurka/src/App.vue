@@ -13,7 +13,7 @@
           <h1>KasKurKa</h1>
         </div>
         <div class="header-user-info">
-          <!-- Notification Bell -->
+          <!-- Paziņojumu zvans -->
           <div
             v-if="currentUser"
             class="notification-bell-container"
@@ -115,6 +115,7 @@
     </header>
 
     <main class="app-main">
+      <!-- Sākuma skats nelietotājam -->
       <template v-if="currentView === 'home' && !currentUser">
         <div class="home-container">
           <section class="intro-section card-style">
@@ -145,24 +146,27 @@
         </div>
       </template>
 
+      <!-- Reģistrācijas skats -->
       <RegisterView
         v-else-if="currentView === 'register'"
         @navigateHome="showHome"
         @registrationSuccess="handleRegistrationSuccess"
       />
+      <!-- Pieslēgšanās skats -->
       <LoginView
         v-else-if="currentView === 'login'"
         @navigateHome="showHome"
         @navigateToRegister="navigateToRegister"
         @loginSuccess="handleLoginSuccess"
       />
+      <!-- Mana Profila skats -->
       <MyProfileView
         v-else-if="currentView === 'myProfile' && currentUser"
         :current-user="currentUser"
         @navigateToUserSpecificDashboard="navigateToUserSpecificDashboard"
       />
 
-      <!-- Student Views -->
+      <!-- Studenta skati -->
       <DashboardView
         v-if="
           currentView === 'dashboard' &&
@@ -208,7 +212,7 @@
         @navigateToDashboard="navigateToUserSpecificDashboard"
       />
 
-      <!-- Admin Views -->
+      <!-- Administratora skati -->
       <AdminDashboardView
         v-else-if="
           currentView === 'adminDashboard' &&
@@ -280,6 +284,7 @@
         @userUpdateSuccess="handleUserUpdateSuccess"
         @cancelEditUser="navigateToManageUsers"
       />
+      <!-- Paziņojumu saraksta skats -->
       <NotificationListView
         v-else-if="currentView === 'notificationList' && currentUser"
         :current-user="currentUser"
@@ -287,11 +292,11 @@
         @notifications-updated="fetchUserNotifications"
       />
 
+      <!-- Ielādes indikators vai tukšs elements -->
       <div v-else-if="isLoadingAuth" class="loading-indicator">
         <i class="fas fa-spinner fa-spin"></i> Notiek ielāde...
       </div>
       <div v-else></div>
-      <!-- Fallback empty div -->
     </main>
 
     <footer class="app-footer">
@@ -304,6 +309,7 @@
 </template>
 
 <script>
+// Komponentu importi
 import RegisterView from "./views/RegisterView.vue";
 import LoginView from "./views/LoginView.vue";
 import DashboardView from "./views/DashboardView.vue";
@@ -319,14 +325,15 @@ import EditGroupView from "./views/EditGroupView.vue";
 import ManageUsersView from "./views/ManageUsersView.vue";
 import EditUserView from "./views/EditUserView.vue";
 import MyProfileView from "./views/MyProfileView.vue";
-import NotificationDropdown from "./components/NotificationDropdown.vue"; // New component
-import NotificationListView from "./views/NotificationListView.vue"; // New view
+import NotificationDropdown from "./components/NotificationDropdown.vue"; // Jauns paziņojumu komponents
+import NotificationListView from "./views/NotificationListView.vue"; // Jauns paziņojumu saraksta skats
 
-import axios from "axios";
+import axios from "axios"; // HTTP pieprasījumiem
 
 export default {
   name: "App",
   components: {
+    // Reģistrētie komponenti
     RegisterView,
     LoginView,
     DashboardView,
@@ -342,16 +349,17 @@ export default {
     ManageUsersView,
     EditUserView,
     MyProfileView,
-    NotificationDropdown, // Register new component
-    NotificationListView, // Register new view
+    NotificationDropdown,
+    NotificationListView,
   },
   data() {
     return {
-      currentView: "home",
-      currentUser: null,
-      isLoadingAuth: true,
-      isAdminViewingAsStudent: false,
+      currentView: "home", // Pašreizējais aktīvais skats
+      currentUser: null, // Pašreizējais pieslēgtais lietotājs
+      isLoadingAuth: true, // Vai notiek autentifikācijas pārbaude
+      isAdminViewingAsStudent: false, // Vai administrators skatās studenta paneli
       dashboardRelatedViews: [
+        // Skati, kas saistīti ar informācijas paneli (header stilam)
         "dashboard",
         "addHomework",
         "addTest",
@@ -365,9 +373,10 @@ export default {
         "manageUsers",
         "editUser",
         "myProfile",
-        "notificationList", // Add notification list view
+        "notificationList",
       ],
       adminSpecificViews: [
+        // Skati, kas pieejami tikai administratoram
         "adminDashboard",
         "createGroup",
         "manageGroupApplications",
@@ -376,58 +385,65 @@ export default {
         "manageUsers",
         "editUser",
       ],
-      editingItemId: null,
-      editingItemType: null,
-      editingGroupId: null,
-      editingUserId: null,
+      editingItemId: null, // Rediģējamā mājasdarba/pārbaudes darba ID
+      editingItemType: null, // Rediģējamā vienuma tips ('homework' vai 'test')
+      editingGroupId: null, // Rediģējamās grupas ID
+      editingUserId: null, // Rediģējamā lietotāja ID
 
-      // Notification related data
-      recentNotifications: [],
-      unreadNotificationCount: 0,
-      showNotificationsDropdown: false,
-      notificationInterval: null,
+      // Ar paziņojumiem saistīti dati
+      recentNotifications: [], // Nesenākie paziņojumi nolaižamajam sarakstam
+      unreadNotificationCount: 0, // Nelasīto paziņojumu skaits
+      showNotificationsDropdown: false, // Vai rādīt paziņojumu nolaižamo sarakstu
+      notificationInterval: null, // Intervāls paziņojumu periodiskai ielādei
     };
   },
   provide() {
+    // Nodrošina funkcijas bērnu komponentiem
     return {
-      refreshUser: this.refreshCurrentUserState,
-      fetchUserNotifications: this.fetchUserNotifications, // Provide this for child components
+      refreshUser: this.refreshCurrentUserState, // Funkcija lietotāja stāvokļa atjaunošanai
+      fetchUserNotifications: this.fetchUserNotifications, // Funkcija paziņojumu ielādei
     };
   },
   created() {
-    this.tryAutoLogin();
-    document.addEventListener("click", this.handleClickOutsideDropdown);
+    // Izpildās, kad komponents tiek izveidots
+    this.tryAutoLogin(); // Mēģina automātiski pieslēgt lietotāju
+    document.addEventListener("click", this.handleClickOutsideDropdown); // Pievieno notikumu klausītāju nolaižamā saraksta aizvēršanai
   },
   beforeUnmount() {
+    // Izpildās pirms komponenta noņemšanas
     if (this.notificationInterval) {
+      // Notīra paziņojumu intervālu
       clearInterval(this.notificationInterval);
     }
-    document.removeEventListener("click", this.handleClickOutsideDropdown);
+    document.removeEventListener("click", this.handleClickOutsideDropdown); // Noņem notikumu klausītāju
   },
   methods: {
+    // Ielādē lietotāja paziņojumus
     async fetchUserNotifications() {
-      if (!this.currentUser) return;
+      if (!this.currentUser) return; // Ja nav pieslēgta lietotāja, nedara neko
       try {
         const response = await axios.get("/api/notifications");
         this.recentNotifications = response.data.notifications;
         this.unreadNotificationCount = response.data.unreadCount;
       } catch (error) {
-        console.error("Error fetching notifications:", error);
-        // Optionally show a non-intrusive error to the user
+        console.error("Kļūda, ielādējot paziņojumus:", error);
+        // Varētu parādīt neuzkrītošu kļūdas ziņojumu lietotājam
       }
     },
+    // Sāk periodisku paziņojumu ielādi
     startNotificationPolling() {
       if (this.notificationInterval) {
         clearInterval(this.notificationInterval);
       }
       if (this.currentUser) {
-        this.fetchUserNotifications(); // Initial fetch
+        this.fetchUserNotifications(); // Sākotnējā ielāde
         this.notificationInterval = setInterval(
           this.fetchUserNotifications,
-          60000
-        ); // Poll every 60 seconds
+          60000 // Pārbauda ik pēc 60 sekundēm
+        );
       }
     },
+    // Pārtrauc periodisku paziņojumu ielādi
     stopNotificationPolling() {
       if (this.notificationInterval) {
         clearInterval(this.notificationInterval);
@@ -436,20 +452,23 @@ export default {
       this.recentNotifications = [];
       this.unreadNotificationCount = 0;
     },
+    // Pārslēdz paziņojumu nolaižamā saraksta redzamību
     toggleNotificationsDropdown() {
       this.showNotificationsDropdown = !this.showNotificationsDropdown;
+      // Ja saraksts tiek atvērts un tas ir tukšs, bet ir nelasīti paziņojumi, ielādē tos
       if (
         this.showNotificationsDropdown &&
         this.recentNotifications.length === 0 &&
         this.unreadNotificationCount > 0
       ) {
-        // If dropdown opens and recent list is empty but there are unread, fetch.
         this.fetchUserNotifications();
       }
     },
+    // Aizver paziņojumu nolaižamo sarakstu
     closeNotificationsDropdown() {
       this.showNotificationsDropdown = false;
     },
+    // Apstrādā klikšķi ārpus nolaižamā saraksta, lai to aizvērtu
     handleClickOutsideDropdown(event) {
       const dropdownContainer = this.$el.querySelector(
         ".notification-bell-container"
@@ -462,106 +481,133 @@ export default {
         this.closeNotificationsDropdown();
       }
     },
+    // Atzīmē paziņojumu kā izlasītu
     async markNotificationAsRead(notificationId) {
       try {
         await axios.put(`/api/notifications/${notificationId}/read`);
-        this.fetchUserNotifications(); // Re-fetch to update list and count
+        this.fetchUserNotifications(); // Pārlādē paziņojumus, lai atjaunotu sarakstu un skaitu
       } catch (error) {
-        console.error("Error marking notification as read:", error);
+        console.error("Kļūda, atzīmējot paziņojumu kā izlasītu:", error);
         alert("Kļūda, atzīmējot paziņojumu kā izlasītu.");
       }
     },
+    // Atzīmē visus paziņojumus kā izlasītus
     async markAllNotificationsAsRead() {
       try {
         await axios.put(`/api/notifications/read-all`);
-        this.fetchUserNotifications(); // Re-fetch
+        this.fetchUserNotifications(); // Pārlādē paziņojumus
         this.closeNotificationsDropdown();
       } catch (error) {
-        console.error("Error marking all notifications as read:", error);
+        console.error(
+          "Kļūda, atzīmējot visus paziņojumus kā izlasītus:",
+          error
+        );
         alert("Kļūda, atzīmējot visus paziņojumus kā izlasītus.");
       }
     },
+    // Pāriet uz paziņojumu saraksta skatu
     navigateToNotificationList() {
       this.currentView = "notificationList";
       this.closeNotificationsDropdown();
-      this.clearAllEditStates();
+      this.clearAllEditStates(); // Notīra visus rediģēšanas stāvokļus
     },
-
+    // Atjauno pašreizējā lietotāja stāvokli no servera
     async refreshCurrentUserState() {
-      console.log("[App.vue] Attempting to refresh current user state...");
+      console.log("[App.vue] Mēģina atjaunot pašreizējā lietotāja stāvokli...");
       if (!this.currentUser || !localStorage.getItem("token")) {
-        console.log("[App.vue] No current user or token, skipping refresh.");
+        console.log(
+          "[App.vue] Nav pašreizējā lietotāja vai pilnvaras, izlaiž atjaunošanu."
+        );
         return;
       }
       try {
         const response = await axios.get("/api/auth/me/refresh");
         const refreshedUser = response.data;
+        // Ja lietotāja ID ir mainījies (maz ticams, bet drošībai), atiestata admina skatīšanās režīmu
         if (this.currentUser.id !== refreshedUser.id) {
           this.isAdminViewingAsStudent = false;
         }
         this.currentUser = refreshedUser;
-        localStorage.setItem("user", JSON.stringify(this.currentUser));
-        console.log("[App.vue] User state refreshed:", this.currentUser);
-        this.startNotificationPolling(); // Refresh notifications too
+        localStorage.setItem("user", JSON.stringify(this.currentUser)); // Saglabā atjaunoto lietotāju localStorage
+        console.log(
+          "[App.vue] Lietotāja stāvoklis atjaunots:",
+          this.currentUser
+        );
+        this.startNotificationPolling(); // Atjauno arī paziņojumus
       } catch (error) {
-        console.error("[App.vue] Error refreshing user state:", error);
+        console.error("[App.vue] Kļūda, atjaunojot lietotāja stāvokli:", error);
+        // Ja serveris atgriež 401 vai 403 kļūdu, lietotājs tiek izrakstīts
         if (
           error.response &&
           (error.response.status === 401 || error.response.status === 403)
         ) {
           this.handleLogout();
-          throw new Error("User refresh failed, logged out.");
+          throw new Error("Lietotāja atjaunošana neizdevās, izrakstīts.");
         }
-        throw error;
+        throw error; // Izmet kļūdu tālākai apstrādei, ja nepieciešams
       }
     },
+    // Pārbauda, vai skats ir saistīts ar informācijas paneli
     isDashboardRelatedView(viewName) {
       return this.dashboardRelatedViews.includes(viewName);
     },
+    // Pārbauda, vai skats ir specifisks administratoram
     isAdminSpecificView(viewName) {
       return this.adminSpecificViews.includes(viewName);
     },
+    // Pārbauda, vai skats ir "Mans Profils"
     isMyProfileView(viewName) {
       return viewName === "myProfile";
     },
+    // Mēģina automātiski pieslēgt lietotāju, ielādējot datus no localStorage
     tryAutoLogin() {
       this.isLoadingAuth = true;
       const token = localStorage.getItem("token");
       const userString = localStorage.getItem("user");
 
       if (token && userString) {
+        // Ja ir saglabāta pilnvara un lietotāja dati
         try {
           const user = JSON.parse(userString);
           this.currentUser = user;
-          axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-          this.startNotificationPolling(); // Start polling for notifications
+          axios.defaults.headers.common["Authorization"] = `Bearer ${token}`; // Iestata autorizācijas galveni Axios
+          this.startNotificationPolling(); // Sāk paziņojumu ielādi
 
+          // Ja pašreizējais skats ir sākumlapa, pieslēgšanās vai reģistrācijas lapa,
+          // un lietotājs ir pieslēdzies, novirza uz atbilstošo informācijas paneli.
           if (
             this.currentView === "home" ||
             this.currentView === "login" ||
             this.currentView === "register"
           ) {
             if (
-              this.isAdminViewingAsStudent &&
-              this.currentView === "dashboard"
+              this.isAdminViewingAsStudent && // Ja administrators skatās kā students
+              this.currentView === "dashboard" // Un pašreizējais skats jau ir studenta panelis
             ) {
-              // Maintain student dashboard view
+              // Saglabā studenta paneļa skatu
             } else if (
-              this.currentUser.role === "admin" &&
-              !this.isAdminViewingAsStudent
+              this.currentUser.role === "admin" && // Ja lietotājs ir administrators
+              !this.isAdminViewingAsStudent // Un neskatās kā students
             ) {
-              this.currentView = "adminDashboard";
+              this.currentView = "adminDashboard"; // Novirza uz admina paneli
             } else if (this.currentUser.role === "student") {
-              this.currentView = "dashboard";
+              // Ja lietotājs ir students
+              this.currentView = "dashboard"; // Novirza uz studenta paneli
             }
           }
         } catch (e) {
-          console.error("Auto-login error, clearing stored data:", e);
-          this.handleLogout(); // This will also stop polling
+          // Ja notiek kļūda, apstrādājot saglabātos datus
+          console.error(
+            "Automātiskās pieslēgšanās kļūda, notīra saglabātos datus:",
+            e
+          );
+          this.handleLogout(); // Izraksta lietotāju
         }
       } else {
+        // Ja nav saglabātas pilnvaras vai lietotāja datu
         this.isAdminViewingAsStudent = false;
-        this.stopNotificationPolling();
+        this.stopNotificationPolling(); // Pārtrauc paziņojumu ielādi
+        // Ja pašreizējais skats ir kāds no aizsargātajiem skatiem, novirza uz sākumlapu
         if (
           this.dashboardRelatedViews.includes(this.currentView) ||
           this.adminSpecificViews.includes(this.currentView) ||
@@ -569,38 +615,44 @@ export default {
         ) {
           this.currentView = "home";
         } else if (!this.currentView) {
+          // Ja skats nav definēts, iestata sākumlapu
           this.currentView = "home";
         }
       }
-      this.isLoadingAuth = false;
+      this.isLoadingAuth = false; // Pabeidz autentifikācijas pārbaudi
     },
+    // Pāriet uz pieslēgšanās skatu
     navigateToLogin() {
       this.currentView = "login";
       this.isAdminViewingAsStudent = false;
       this.clearAllEditStates();
       this.stopNotificationPolling();
     },
+    // Pāriet uz reģistrācijas skatu
     navigateToRegister() {
       this.currentView = "register";
       this.isAdminViewingAsStudent = false;
       this.clearAllEditStates();
       this.stopNotificationPolling();
     },
+    // Rāda sākumlapu
     showHome() {
       this.currentView = "home";
       this.isAdminViewingAsStudent = false;
       this.clearAllEditStates();
-      // If user is logged in, polling should continue, otherwise it should be stopped (handled by tryAutoLogin/logout)
+      // Ja lietotājs ir pieslēdzies, paziņojumu ielādei jāturpinās, citādi jābūt apturētai
     },
+    // Pāriet uz "Mans Profils" skatu
     navigateToMyProfile() {
       if (this.currentUser) {
         this.isAdminViewingAsStudent = false;
         this.currentView = "myProfile";
       } else {
-        this.navigateToLogin();
+        this.navigateToLogin(); // Ja nav pieslēdzies, pāriet uz pieslēgšanos
       }
       this.clearAllEditStates();
     },
+    // Pāriet uz lietotājam specifisko informācijas paneli (studenta vai admina)
     navigateToUserSpecificDashboard() {
       if (this.currentUser) {
         if (
@@ -616,66 +668,74 @@ export default {
       }
       this.clearAllEditStates();
     },
+    // Pāriet uz studenta informācijas paneli (administratoram)
     navigateToStudentDashboard() {
       if (this.currentUser && this.currentUser.role === "admin") {
-        this.isAdminViewingAsStudent = true;
+        this.isAdminViewingAsStudent = true; // Iestata, ka administrators skatās kā students
         this.currentView = "dashboard";
       } else if (this.currentUser && this.currentUser.role === "student") {
-        this.currentView = "dashboard";
+        this.currentView = "dashboard"; // Ja ir students, vienkārši pāriet uz studenta paneli
       } else {
         this.navigateToLogin();
       }
       this.clearAllEditStates();
     },
+    // Atgriežas administratora skatā (no studenta paneļa skatīšanās režīma)
     returnToAdminView() {
       if (this.currentUser && this.currentUser.role === "admin") {
         this.isAdminViewingAsStudent = false;
         this.currentView = "adminDashboard";
       } else {
-        this.showHome();
+        this.showHome(); // Ja nav administrators, pāriet uz sākumlapu
       }
       this.clearAllEditStates();
     },
+    // Apstrādā veiksmīgu reģistrāciju
     handleRegistrationSuccess() {
       this.currentView = "login";
       this.isAdminViewingAsStudent = false;
       alert("Reģistrācija veiksmīga! Lūdzu, pieslēdzieties.");
       this.clearAllEditStates();
     },
+    // Apstrādā veiksmīgu pieslēgšanos
     handleLoginSuccess(authData) {
-      this.currentUser = authData.user;
-      localStorage.setItem("token", authData.token);
-      localStorage.setItem("user", JSON.stringify(authData.user));
-      axios.defaults.headers.common[
+      this.currentUser = authData.user; // Saglabā lietotāja datus
+      localStorage.setItem("token", authData.token); // Saglabā pilnvaru localStorage
+      localStorage.setItem("user", JSON.stringify(authData.user)); // Saglabā lietotāja datus localStorage
+      axios.defaults.headers.common[ // Iestata autorizācijas galveni Axios
         "Authorization"
       ] = `Bearer ${authData.token}`;
       this.isAdminViewingAsStudent = false;
-      this.startNotificationPolling();
-      this.navigateToUserSpecificDashboard();
+      this.startNotificationPolling(); // Sāk paziņojumu ielādi
+      this.navigateToUserSpecificDashboard(); // Pāriet uz atbilstošo paneli
     },
+    // Apstrādā izrakstīšanos
     handleLogout() {
-      this.currentUser = null;
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
-      delete axios.defaults.headers.common["Authorization"];
+      this.currentUser = null; // Notīra lietotāja datus
+      localStorage.removeItem("token"); // Noņem pilnvaru no localStorage
+      localStorage.removeItem("user"); // Noņem lietotāja datus no localStorage
+      delete axios.defaults.headers.common["Authorization"]; // Noņem autorizācijas galveni no Axios
       this.isAdminViewingAsStudent = false;
-      this.stopNotificationPolling();
-      this.currentView = "home";
+      this.stopNotificationPolling(); // Pārtrauc paziņojumu ielādi
+      this.currentView = "home"; // Pāriet uz sākumlapu
       alert("Jūs esat veiksmīgi izgājis no sistēmas.");
       this.clearAllEditStates();
     },
+    // Pāriet uz mājasdarba pievienošanas skatu
     navigateToAddHomework() {
       if (this.currentUser) {
         this.clearAllEditStates();
         this.currentView = "addHomework";
       } else this.navigateToLogin();
     },
+    // Pāriet uz pārbaudes darba pievienošanas skatu
     navigateToAddTest() {
       if (this.currentUser) {
         this.clearAllEditStates();
         this.currentView = "addTest";
       } else this.navigateToLogin();
     },
+    // Pāriet uz vienuma rediģēšanas skatu (mājasdarbs vai pārbaudes darbs)
     navigateToEditItem({ itemId, itemType }) {
       if (this.currentUser) {
         this.clearAllEditStates();
@@ -686,16 +746,19 @@ export default {
         this.navigateToLogin();
       }
     },
+    // Atceļ vienuma rediģēšanu
     cancelEditItem() {
       this.clearAllEditStates();
-      this.navigateToHomeworkList();
+      this.navigateToHomeworkList(); // Atgriežas darbu sarakstā
     },
+    // Apstrādā veiksmīgu darbību ar vienumu (pievienošana/rediģēšana)
     handleItemActionSuccess(message) {
       alert(message || "Darbība veiksmīga!");
-      this.fetchUserNotifications(); // Update notifications if item action could generate one
+      this.fetchUserNotifications(); // Atjauno paziņojumus, ja darbība varēja tos radīt
       this.clearAllEditStates();
-      this.navigateToHomeworkList();
+      this.navigateToHomeworkList(); // Atgriežas darbu sarakstā
     },
+    // Pāriet uz mājasdarbu/pārbaudes darbu saraksta skatu
     navigateToHomeworkList() {
       if (this.currentUser) {
         this.currentView = "homeworkList";
@@ -704,10 +767,12 @@ export default {
         this.navigateToLogin();
       }
     },
+    // Apstrādā vienuma dzēšanu sarakstā
     handleItemDeletedInList(message) {
       alert(message || "Ieraksts dzēsts.");
-      this.fetchUserNotifications(); // Update notifications if item deletion impacts them
+      this.fetchUserNotifications(); // Atjauno paziņojumus, ja dzēšana tos ietekmēja
     },
+    // Pāriet uz grupu saraksta skatu
     navigateToGroupList() {
       if (this.currentUser) {
         this.currentView = "groupList";
@@ -716,15 +781,17 @@ export default {
         this.navigateToLogin();
       }
     },
+    // Pāriet uz administratora informācijas paneli
     navigateToAdminDashboard() {
       if (this.currentUser && this.currentUser.role === "admin") {
         this.isAdminViewingAsStudent = false;
         this.currentView = "adminDashboard";
       } else {
-        this.showHome();
+        this.showHome(); // Ja nav administrators, pāriet uz sākumlapu
       }
       this.clearAllEditStates();
     },
+    // Pāriet uz grupas izveides skatu
     navigateToCreateGroup() {
       if (this.currentUser && this.currentUser.role === "admin") {
         this.isAdminViewingAsStudent = false;
@@ -734,10 +801,12 @@ export default {
       }
       this.clearAllEditStates();
     },
+    // Apstrādā veiksmīgu grupas izveidi
     handleGroupCreated(message) {
       alert(message || "Grupa veiksmīgi izveidota!");
-      this.navigateToAdminDashboard();
+      this.navigateToAdminDashboard(); // Atgriežas admina panelī
     },
+    // Pāriet uz grupu pieteikumu pārvaldības skatu
     navigateToManageGroupApplications() {
       if (this.currentUser && this.currentUser.role === "admin") {
         this.isAdminViewingAsStudent = false;
@@ -747,6 +816,7 @@ export default {
       }
       this.clearAllEditStates();
     },
+    // Pāriet uz grupu pārvaldības skatu
     navigateToManageGroups() {
       if (this.currentUser && this.currentUser.role === "admin") {
         this.isAdminViewingAsStudent = false;
@@ -756,20 +826,23 @@ export default {
       }
       this.clearAllEditStates();
     },
+    // Pāriet uz grupas rediģēšanas skatu
     navigateToEditGroup(groupId) {
       if (this.currentUser && this.currentUser.role === "admin") {
         this.isAdminViewingAsStudent = false;
         this.clearAllEditStates();
-        this.editingGroupId = groupId;
+        this.editingGroupId = groupId; // Saglabā rediģējamās grupas ID
         this.currentView = "editGroup";
       } else {
         this.navigateToLogin();
       }
     },
+    // Apstrādā veiksmīgu grupas atjaunināšanu
     handleGroupUpdateSuccess(message) {
       alert(message || "Grupa veiksmīgi atjaunināta!");
-      this.navigateToManageGroups();
+      this.navigateToManageGroups(); // Atgriežas grupu pārvaldības skatā
     },
+    // Pāriet uz lietotāju pārvaldības skatu
     navigateToManageUsers() {
       if (this.currentUser && this.currentUser.role === "admin") {
         this.isAdminViewingAsStudent = false;
@@ -779,20 +852,23 @@ export default {
       }
       this.clearAllEditStates();
     },
+    // Pāriet uz lietotāja rediģēšanas skatu
     navigateToEditUser(userId) {
       if (this.currentUser && this.currentUser.role === "admin") {
         this.isAdminViewingAsStudent = false;
         this.clearAllEditStates();
-        this.editingUserId = userId;
+        this.editingUserId = userId; // Saglabā rediģējamā lietotāja ID
         this.currentView = "editUser";
       } else {
         this.navigateToLogin();
       }
     },
+    // Apstrādā veiksmīgu lietotāja datu atjaunināšanu
     handleUserUpdateSuccess(message) {
       alert(message || "Lietotāja dati veiksmīgi atjaunināti!");
-      this.navigateToManageUsers();
+      this.navigateToManageUsers(); // Atgriežas lietotāju pārvaldības skatā
     },
+    // Notīra visus rediģēšanas stāvokļus (ID un tipus)
     clearAllEditStates() {
       this.editingItemId = null;
       this.editingItemType = null;
@@ -804,37 +880,37 @@ export default {
 </script>
 
 <style>
-/* Global Styles (existing styles) */
+/* Globālie stili (esošie stili) */
 :root {
-  --primary-color: #007bff; /* Vibrant Blue */
-  --secondary-color: #6c757d; /* Grey */
-  --accent-color: #ffc107; /* Yellow Accent */
-  --success-color: #28a745; /* Green */
-  --danger-color: #dc3545; /* Red */
-  --warning-color: #ffc107; /* Yellow */
-  --info-color: #17a2b8; /* Teal */
+  --primary-color: #007bff; /* Dzirkstoši zils */
+  --secondary-color: #6c757d; /* Pelēks */
+  --accent-color: #ffc107; /* Dzeltens akcents */
+  --success-color: #28a745; /* Zaļš */
+  --danger-color: #dc3545; /* Sarkans */
+  --warning-color: #ffc107; /* Dzeltens */
+  --info-color: #17a2b8; /* Zilganzaļš */
 
-  --text-color: #343a40; /* Darker Grey for text */
-  --text-color-light: #f8f9fa; /* Light text for dark backgrounds */
-  --link-color: #007bff;
-  --link-hover-color: #0056b3;
+  --text-color: #343a40; /* Tumšāks pelēks tekstam */
+  --text-color-light: #f8f9fa; /* Gaišs teksts tumšiem foniem */
+  --link-color: #007bff; /* Saites krāsa */
+  --link-hover-color: #0056b3; /* Saites krāsa uzvedoties */
 
-  --bg-color: #f0f2f5; /* Light Grey page background */
-  --card-bg-color: #ffffff; /* White for cards/forms */
-  --header-bg-color: #273444; /* Dark Blue-Grey for header */
-  --footer-bg-color: #212a36; /* Slightly darker for footer */
+  --bg-color: #f0f2f5; /* Gaiši pelēks lapas fons */
+  --card-bg-color: #ffffff; /* Balts kartītēm/formām */
+  --header-bg-color: #273444; /* Tumši zilganpelēks galvenei */
+  --footer-bg-color: #212a36; /* Nedaudz tumšāks kājenei */
 
-  --border-color: #dee2e6; /* Light Grey for borders */
-  --border-radius: 0.3rem; /* Softer border radius */
+  --border-color: #dee2e6; /* Gaiši pelēks apmalēm */
+  --border-radius: 0.3rem; /* Mīkstāks apmaļu noapaļojums */
 
   --font-family-sans-serif: "Inter", -apple-system, BlinkMacSystemFont,
-    "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --font-size-base: 1rem;
-  --line-height-base: 1.6;
+    "Segoe UI", Roboto, Helvetica, Arial, sans-serif; /* Galvenais fonts */
+  --font-size-base: 1rem; /* Bāzes fonta lielums */
+  --line-height-base: 1.6; /* Bāzes rindstarpa */
 
-  --shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
-  --shadow-md: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
-  --shadow-lg: 0 1rem 3rem rgba(0, 0, 0, 0.175);
+  --shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075); /* Maza ēna */
+  --shadow-md: 0 0.5rem 1rem rgba(0, 0, 0, 0.15); /* Vidēja ēna */
+  --shadow-lg: 0 1rem 3rem rgba(0, 0, 0, 0.175); /* Liela ēna */
 }
 
 body {
@@ -845,53 +921,61 @@ body {
   color: var(--text-color);
   line-height: var(--line-height-base);
   font-size: var(--font-size-base);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  -webkit-font-smoothing: antialiased; /* Fontu mīkstināšana Webkit pārlūkiem */
+  -moz-osx-font-smoothing: grayscale; /* Fontu mīkstināšana Firefox */
 }
 
 #app-container {
+  /* Galvenais lietotnes konteiners */
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  min-height: 100vh; /* Minimālais augstums, lai kājene vienmēr būtu apakšā */
 }
 
 .app-header {
+  /* Galvenes stili */
   background-color: var(--header-bg-color);
   color: var(--text-color-light);
   padding: 1rem 1.5rem;
   box-shadow: var(--shadow-md);
-  z-index: 1000;
+  z-index: 1000; /* Nodrošina, ka galvene ir virs cita satura */
 }
 .app-header .header-content {
+  /* Galvenes satura konteiners */
   display: flex;
   justify-content: space-between;
   align-items: center;
-  flex-wrap: wrap;
-  max-width: 1200px;
-  margin: 0 auto;
+  flex-wrap: wrap; /* Atļauj elementiem pāriet jaunā rindā, ja nepietiek vietas */
+  max-width: 1200px; /* Maksimālais platums */
+  margin: 0 auto; /* Centēšana */
 }
 .app-header .logo-title-container {
+  /* Logo un nosaukuma konteiners */
   display: flex;
   align-items: center;
   gap: 0.75rem;
 }
 .app-header .logo-icon {
+  /* Logo ikona */
   font-size: 2rem;
   color: var(--accent-color);
 }
 .app-header h1 {
+  /* Lietotnes nosaukums */
   margin: 0;
   font-size: 1.75rem;
   font-weight: 700;
   letter-spacing: -0.5px;
 }
 .app-header .header-user-info {
+  /* Lietotāja informācijas un darbību bloks galvenē */
   display: flex;
   align-items: center;
   gap: 1rem;
   flex-wrap: wrap;
 }
 .app-header .header-link {
+  /* Vispārīgs stils saitēm galvenē */
   color: #e0e0e0;
   text-decoration: none;
   font-weight: 500;
@@ -903,10 +987,12 @@ body {
   gap: 0.5rem;
 }
 .app-header .header-link:hover {
+  /* Uzvedoties virs saites */
   background-color: rgba(255, 255, 255, 0.1);
   color: var(--text-color-light);
 }
 .app-header .profile-link {
+  /* Profila saites specifiskie stili */
   color: var(--accent-color);
 }
 .app-header .profile-link:hover {
@@ -914,6 +1000,7 @@ body {
   background-color: var(--accent-color);
 }
 .app-header .admin-panel-link {
+  /* Admina paneļa saites specifiskie stili */
   color: var(--info-color);
 }
 .app-header .admin-panel-link:hover {
@@ -921,35 +1008,39 @@ body {
   background-color: var(--info-color);
 }
 .app-header .return-to-admin-link {
+  /* "Atgriezties Admin Panelī" pogas stili */
   background-color: var(--warning-color);
   color: var(--text-color);
 }
 .app-header .return-to-admin-link:hover {
-  background-color: #e0a800;
+  background-color: #e0a800; /* Tumšāks dzeltens */
   color: var(--text-color);
 }
 .app-header .user-greeting {
+  /* Lietotāja sveiciena teksts */
   font-size: 0.95rem;
   display: flex;
   align-items: center;
   gap: 0.5rem;
 }
 .app-header .user-greeting .user-group-display {
+  /* Lietotāja grupas attēlojums */
   font-size: 0.85rem;
   opacity: 0.8;
   margin-left: 0.25rem;
 }
 .app-header .user-greeting .viewing-as-student-indicator {
+  /* Indikators, ka administrators skatās kā students */
   font-weight: bold;
   color: var(--warning-color);
   opacity: 1;
 }
 
-/* Notification Bell Styles */
+/* Paziņojumu zvana stili */
 .notification-bell-container {
-  position: relative;
+  position: relative; /* Nepieciešams emblēmas pozicionēšanai */
   cursor: pointer;
-  padding: 0.5rem 0.75rem; /* Similar to header-link for alignment */
+  padding: 0.5rem 0.75rem; /* Līdzīgi kā .header-link */
   border-radius: var(--border-radius);
   transition: background-color 0.2s ease;
 }
@@ -957,23 +1048,24 @@ body {
   background-color: rgba(255, 255, 255, 0.1);
 }
 .notification-icon {
-  font-size: 1.25rem; /* Adjust size as needed */
-  color: #e0e0e0; /* Match header link color */
+  font-size: 1.25rem;
+  color: #e0e0e0;
 }
 .notification-bell-container:hover .notification-icon {
   color: var(--text-color-light);
 }
 .notification-badge {
+  /* Nelasīto paziņojumu skaita emblēma */
   position: absolute;
-  top: 2px; /* Adjust position */
-  right: 2px; /* Adjust position */
+  top: 2px;
+  right: 2px;
   background-color: var(--danger-color);
   color: white;
-  border-radius: 50%;
-  padding: 0.15em 0.45em; /* Adjust padding for size */
-  font-size: 0.7rem; /* Smaller font for badge */
+  border-radius: 50%; /* Apaļa forma */
+  padding: 0.15em 0.45em;
+  font-size: 0.7rem;
   font-weight: bold;
-  min-width: 18px; /* Ensure circle for single digit */
+  min-width: 18px;
   height: 18px;
   display: flex;
   justify-content: center;
@@ -982,21 +1074,23 @@ body {
   box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
 }
 
-/* Main Content Styles */
+/* Galvenā satura stili */
 .app-main {
-  flex-grow: 1;
+  flex-grow: 1; /* Nodrošina, ka galvenais saturs aizpilda atlikušo vietu */
   padding: 1.5rem;
   margin: 0 auto;
   width: 100%;
-  max-width: 1200px;
+  max-width: 1200px; /* Maksimālais platums saturam */
   box-sizing: border-box;
 }
 .home-container {
+  /* Sākumlapas konteiners */
   width: 100%;
   max-width: 900px;
   margin: 0 auto;
 }
 .card-style {
+  /* Vispārīgs stils kartītēm */
   background-color: var(--card-bg-color);
   border-radius: var(--border-radius);
   box-shadow: var(--shadow-sm);
@@ -1004,21 +1098,25 @@ body {
   margin-bottom: 1.5rem;
 }
 .intro-section {
+  /* Ievada sekcija sākumlapā */
   text-align: left;
 }
 .intro-section .intro-title {
+  /* Ievada virsraksts */
   font-size: 1.75rem;
   color: var(--header-bg-color);
   margin-bottom: 1rem;
   text-align: center;
 }
 .intro-section p {
+  /* Ievada teksts */
   font-size: 1.05rem;
   color: #555;
   line-height: 1.7;
   margin-bottom: 1rem;
 }
 .actions-nav {
+  /* Darbību pogu navigācija (piem., Pieslēgties, Reģistrēties) */
   display: flex;
   justify-content: center;
   gap: 1rem;
@@ -1026,7 +1124,7 @@ body {
   margin-top: 1.5rem;
 }
 
-/* Button Styles */
+/* Pogu stili */
 .action-button {
   border: none;
   padding: 0.75rem 1.5rem;
@@ -1036,52 +1134,59 @@ body {
   cursor: pointer;
   transition: background-color 0.2s ease, box-shadow 0.2s ease,
     transform 0.1s ease;
-  display: inline-flex;
+  display: inline-flex; /* Lai ikona un teksts būtu vienā rindā */
   align-items: center;
-  gap: 0.5rem;
-  text-decoration: none;
-  white-space: nowrap;
+  gap: 0.5rem; /* Atstarpe starp ikonu un tekstu */
+  text-decoration: none; /* Noņem pasvītrojumu, ja poga ir saite */
+  white-space: nowrap; /* Neļauj tekstam pāriet jaunā rindā */
 }
 .action-button:hover:not([disabled]) {
+  /* Uzvedoties virs pogas (ja nav atspējota) */
   box-shadow: var(--shadow-sm);
 }
 .action-button:active:not([disabled]) {
-  transform: translateY(1px);
+  /* Nospiežot pogu (ja nav atspējota) */
+  transform: translateY(1px); /* Nedaudz pabīda uz leju */
 }
 .action-button.primary-button {
+  /* Primārā poga */
   background-color: var(--primary-color);
   color: var(--text-color-light);
 }
 .action-button.primary-button:hover:not([disabled]) {
-  background-color: #0069d9;
+  background-color: #0069d9; /* Tumšāks primārais */
 }
 .action-button.secondary-button {
+  /* Sekundārā poga */
   background-color: var(--secondary-color);
   color: var(--text-color-light);
 }
 .action-button.secondary-button:hover:not([disabled]) {
-  background-color: #5a6268;
+  background-color: #5a6268; /* Tumšāks sekundārais */
 }
 .action-button[disabled] {
+  /* Atspējota poga */
   background-color: #e9ecef;
   color: #6c757d;
-  cursor: not-allowed;
+  cursor: not-allowed; /* Rāda neatļautu kursoru */
   opacity: 0.7;
 }
 
-/* Form Styles */
+/* Formu stili */
 .form-view {
+  /* Vispārīgs stils formu skatiem */
   max-width: 650px;
   margin: 1rem auto;
   padding: 2rem;
   background-color: var(--card-bg-color);
   border-radius: var(--border-radius);
   box-shadow: var(--shadow-md);
-  text-align: left;
+  text-align: left; /* Formas elementi līdzināsies pa kreisi */
   width: 100%;
   box-sizing: border-box;
 }
 .form-view h2 {
+  /* Formas virsraksts */
   text-align: center;
   color: var(--header-bg-color);
   margin-top: 0;
@@ -1090,16 +1195,18 @@ body {
   font-weight: 600;
 }
 .form-group {
+  /* Atsevišķa formas grupa (etiķete + ievadloks) */
   margin-bottom: 1.25rem;
 }
 .form-group label {
-  display: block;
+  /* Etiķete */
+  display: block; /* Aizņem visu platumu */
   margin-bottom: 0.5rem;
   font-weight: 600;
   color: var(--text-color);
   font-size: 0.95rem;
 }
-.form-group input[type="text"],
+.form-group input[type="text"], /* Stili dažādiem ievada tipiem */
 .form-group input[type="email"],
 .form-group input[type="password"],
 .form-group input[type="number"],
@@ -1107,41 +1214,45 @@ body {
 .form-group input[type="time"],
 .form-group textarea,
 .form-group select {
-  width: 100%;
+  width: 100%; /* Aizņem visu pieejamo platumu */
   padding: 0.75rem;
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius);
   font-size: 1rem;
-  box-sizing: border-box;
+  box-sizing: border-box; /* Iekļauj padding un border platumā */
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
-  background-color: #fff;
+  background-color: #fff; /* Gaišs fons ievadlaukam */
 }
 .form-group input[type="file"] {
+  /* Faila augšupielādes lauka specifisks stils */
   padding: 0.5rem;
 }
 .form-group textarea {
-  min-height: 120px;
-  resize: vertical;
+  /* Teksta lauka stili */
+  min-height: 120px; /* Minimālais augstums */
+  resize: vertical; /* Atļauj mainīt augstumu vertikāli */
 }
-.form-group input:focus,
+.form-group input:focus, /* Stili, kad ievadloks ir fokusā */
 .form-group textarea:focus,
 .form-group select:focus {
   border-color: var(--primary-color);
-  outline: none;
-  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+  outline: none; /* Noņem noklusējuma fokusa apmali */
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25); /* Pievieno pielāgotu fokusa ēnu */
 }
 .form-group small {
+  /* Mazs teksts zem ievadlauka (palīdzība, validācija) */
   display: block;
   margin-top: 0.3rem;
   font-size: 0.85rem;
   color: #6c757d;
 }
 .required-field {
+  /* Obligātā lauka zvaigznīte */
   color: var(--danger-color);
   margin-left: 2px;
 }
 
-/* Message Styles */
+/* Ziņojumu stili (kļūdas, veiksmes) */
 .error-message,
 .success-message {
   padding: 0.8rem 1rem;
@@ -1151,18 +1262,21 @@ body {
   font-weight: 500;
 }
 .error-message {
-  color: #721c24;
-  background-color: #f8d7da;
-  border: 1px solid #f5c6cb;
+  /* Kļūdas ziņojums */
+  color: #721c24; /* Tumši sarkans teksts */
+  background-color: #f8d7da; /* Gaiši sarkans fons */
+  border: 1px solid #f5c6cb; /* Sarkana apmale */
 }
 .success-message {
-  color: #155724;
-  background-color: #d4edda;
-  border: 1px solid #c3e6cb;
+  /* Veiksmes ziņojums */
+  color: #155724; /* Tumši zaļš teksts */
+  background-color: #d4edda; /* Gaiši zaļš fons */
+  border: 1px solid #c3e6cb; /* Zaļa apmale */
 }
 
-/* Back Button & Form Actions */
+/* Atpakaļ pogas un formas darbību stili */
 .back-button {
+  /* "Atpakaļ" poga */
   background: none;
   border: none;
   color: var(--link-color);
@@ -1180,23 +1294,24 @@ body {
   text-decoration: underline;
 }
 .form-actions {
+  /* Konteiners formas darbību pogām */
   display: flex;
-  justify-content: space-between;
+  justify-content: space-between; /* Izlīdzina pogas (piem., Atcelt pa kreisi, Iesniegt pa labi) */
   align-items: center;
   margin-top: 1.5rem;
 }
 
-/* Footer Styles */
+/* Kājenes stili */
 .app-footer {
   background-color: var(--footer-bg-color);
-  color: #adb5bd;
+  color: #adb5bd; /* Gaišāks teksts uz tumša fona */
   padding: 1.5rem 1rem;
   font-size: 0.85rem;
   text-align: center;
-  margin-top: auto;
+  margin-top: auto; /* Piespiež kājeni lapas apakšai */
 }
 
-/* Loading Indicator */
+/* Ielādes indikatora stili */
 .loading-indicator {
   display: flex;
   justify-content: center;
@@ -1206,19 +1321,24 @@ body {
   color: var(--primary-color);
 }
 .loading-indicator .fa-spinner {
+  /* Griežošā ikona */
   margin-right: 0.75rem;
 }
 
-/* Responsive Adjustments */
+/* Responsīvie pielāgojumi */
 @media (max-width: 768px) {
+  /* Planšetdatoriem un mazākiem ekrāniem */
   .app-header .header-content {
+    /* Galvenes saturs kolonnā */
     flex-direction: column;
     gap: 0.75rem;
   }
   .app-header h1 {
+    /* Mazāks nosaukums */
     font-size: 1.5rem;
   }
   .app-header .header-user-info {
+    /* Lietotāja informācija kolonnā */
     flex-direction: column;
     align-items: center;
     width: 100%;
@@ -1227,56 +1347,71 @@ body {
   .app-header .header-link,
   .app-header .return-to-admin-link,
   .app-header .notification-bell-container {
-    /* Include notification bell */
+    /* Galvenes saites un paziņojumu zvans aizņem visu platumu */
     width: 100%;
     justify-content: center;
   }
   .form-view {
+    /* Mazākas atkāpes formām */
     margin: 1rem;
     padding: 1.5rem;
   }
 }
 
 @media (max-width: 600px) {
+  /* Viedtālruņiem */
   :root {
+    /* Mazāks bāzes fonta lielums */
     --font-size-base: 0.95rem;
   }
   .app-header {
+    /* Mazākas galvenes atkāpes */
     padding: 0.75rem 1rem;
   }
   .app-header .logo-icon {
+    /* Mazāka logo ikona */
     font-size: 1.75rem;
   }
   .app-header h1 {
+    /* Vēl mazāks nosaukums */
     font-size: 1.4rem;
   }
   .intro-section .intro-title {
+    /* Mazāks ievada virsraksts */
     font-size: 1.5rem;
   }
   .intro-section p {
+    /* Mazāks ievada teksts */
     font-size: 1rem;
   }
   .actions-nav .action-button {
+    /* Darbību pogas sākumlapā aizņem visu platumu */
     width: 100%;
     max-width: 320px;
     margin: 0.5rem auto;
   }
   .app-main {
+    /* Mazākas galvenā satura atkāpes */
     padding: 1rem;
   }
   .form-view {
+    /* Vēl mazākas formu atkāpes */
     padding: 1.25rem;
   }
   .form-view h2 {
+    /* Mazāks formas virsraksts */
     font-size: 1.5rem;
   }
   .form-actions {
+    /* Formas darbību pogas kolonnā */
     flex-direction: column;
   }
   .form-actions .action-button {
+    /* Pogas aizņem visu platumu */
     width: 100%;
     margin-bottom: 0.75rem;
   }
+  /* Maina pogu secību mobilajā skatā, lai primārā poga būtu augšā */
   .form-actions .action-button.secondary-action,
   .form-actions .back-button {
     margin-top: 0.5rem;
@@ -1286,6 +1421,7 @@ body {
     order: 1;
   }
   .form-actions .back-button {
+    /* Atpakaļ poga centrēta */
     align-self: center;
   }
 }

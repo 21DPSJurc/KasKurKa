@@ -1,11 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const { getDB } = require('../config/db');
-const authMiddleware = require('../middleware/authMiddleware');
-const { ObjectId } = require('mongodb');
-// Multer and related file upload logic removed
+const authMiddleware = require('../middleware/authMiddleware'); // Autentifikācijas starpprogrammatūra.
+const { ObjectId } = require('mongodb'); // MongoDB ObjectId.
+// Multer un saistītā failu augšupielādes loģika ir noņemta.
 
-// Helper function to create notifications (can be moved to a service later)
+// Palīgfunkcija paziņojumu izveidei (vēlāk var pārvietot uz servisu).
 async function createNotification(db, recipientUserId, type, message, link, relatedItemId, relatedItemType) {
   try {
     const notificationsCollection = db.collection('notifications');
@@ -20,40 +20,45 @@ async function createNotification(db, recipientUserId, type, message, link, rela
       relatedItemType: relatedItemType || null,
     });
   } catch (error) {
-    console.error(`Error creating notification for user ${recipientUserId}:`, error);
+    console.error(`Kļūda, veidojot paziņojumu lietotājam ${recipientUserId}:`, error);
   }
 }
 
 // @route   POST api/homework
-// @desc    Add a new homework assignment
-// @access  Private
+// @desc    Pievieno jaunu mājasdarba uzdevumu.
+// @access  Privāts
 router.post('/', authMiddleware, async (req, res) => {
-  // File upload logic removed
+  // Failu augšupielādes loģika noņemta.
   const { subject, description, dueDate, additionalInfo, links, customGroupId } = req.body;
-  const errors = [];
+  const errors = []; // Masīvs kļūdu ziņojumiem.
 
+  // Validācijas.
   if (!subject || subject.trim() === '') errors.push('Mācību priekšmets ir obligāts lauks.');
   if (!description || description.trim() === '') errors.push('Detalizēts uzdevuma apraksts ir obligāts lauks.');
   if (!dueDate) errors.push('Izpildes termiņš ir obligāts lauks.');
   else {
+    // Datuma formāta validācija.
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
     if (!dateRegex.test(dueDate) || isNaN(new Date(dueDate).getTime())) {
       errors.push('Norādītais datums nav korekts. Izmantojiet GGGG-MM-DD formātu.');
     }
   }
+  // Pārbauda, vai ir norādīts derīgs grupas ID.
   if (!customGroupId || !ObjectId.isValid(customGroupId)) {
     errors.push('Nepieciešams norādīt derīgu grupu, kurai pievienot mājasdarbu.');
   }
 
+  // Validē saites, ja tās ir norādītas.
   if (links && links.trim() !== '') {
     const linksArray = links.split('\n').map(link => link.trim()).filter(link => link !== '');
     for (const link of linksArray) {
       if (!link.startsWith('http://') && !link.startsWith('https://')) {
         errors.push(`Saite "${link.substring(0, 30)}..." nav korekta. Tai jāsākas ar http:// vai https://`);
-        break;
+        break; // Pietiek ar vienu nekorektu saiti.
       }
     }
   }
+  // Ja ir validācijas kļūdas, atgriež pirmo no tām.
   if (errors.length > 0) return res.status(400).json({ msg: errors[0] });
 
   try {
@@ -62,53 +67,57 @@ router.post('/', authMiddleware, async (req, res) => {
     const usersCollection = db.collection('users');
     const groupsCollection = db.collection('groups');
 
+    // Atrod lietotāju, kas veido mājasdarbu.
     const userCreating = await usersCollection.findOne({ _id: new ObjectId(req.user.id) });
     if (!userCreating) {
       return res.status(404).json({ msg: 'Lietotājs nav atrasts.' });
     }
 
+    // Pārbauda, vai mērķa grupa eksistē.
     const groupObjectId = new ObjectId(customGroupId);
     const targetGroup = await groupsCollection.findOne({ _id: groupObjectId });
     if (!targetGroup) {
       return res.status(400).json({ msg: 'Norādītā grupa neeksistē.' });
     }
 
+    // Pārbauda studenta tiesības pievienot mājasdarbu šai grupai.
     if (req.user.role === 'student') {
       const enrolledIds = (userCreating.enrolledCustomGroups || []).map(id => id.toString());
       if (!enrolledIds.includes(customGroupId)) {
         return res.status(403).json({ msg: 'Jums nav tiesību pievienot mājasdarbu šai grupai.' });
       }
     }
-    // Admin can post to any group (already checked if group exists)
+    // Administrators var pievienot jebkurai grupai (grupas eksistence jau pārbaudīta).
 
-    // fileAttachments field removed
+    // `fileAttachments` lauks noņemts.
     const newHomework = {
       subject, description, dueDate: new Date(dueDate), additionalInfo: additionalInfo || '',
       links: links ? links.split('\n').map(link => link.trim()).filter(link => link !== '') : [],
-      // fileAttachments removed
-      userId: new ObjectId(req.user.id),
-      userFirstName: req.user.firstName,
-      userGroup: req.user.group,
-      userStudyStartYear: req.user.studyStartYear,
-      customGroupId: groupObjectId,
+      // `fileAttachments` noņemts.
+      userId: new ObjectId(req.user.id), // Mājasdarba autora ID.
+      userFirstName: req.user.firstName, // Autora vārds.
+      userGroup: req.user.group, // Autora reģistrācijas grupa.
+      userStudyStartYear: req.user.studyStartYear, // Autora studiju sākuma gads.
+      customGroupId: groupObjectId, // Pielāgotās grupas ID, kurai mājasdarbs pieder.
       createdAt: new Date(),
       updatedAt: new Date(),
-      type: 'homework'
+      type: 'homework' // Vienuma tips.
     };
     const result = await homeworkCollection.insertOne(newHomework);
     const createdHomework = await homeworkCollection.findOne({ _id: result.insertedId });
 
-    // Add groupName to the returned object for immediate display
+    // Pievieno grupas nosaukumu atgriežamajam objektam tūlītējai attēlošanai.
     createdHomework.customGroupName = targetGroup.name;
 
 
-    // Create notifications for group members
+    // Izveido paziņojumus grupas dalībniekiem.
     if (targetGroup.members && targetGroup.members.length > 0) {
       const notificationMessage = `Grupai '${targetGroup.name}' pievienots jauns mājasdarbs: "${createdHomework.subject}".`;
-      const notificationLink = `/homework-list`;
+      const notificationLink = `/homework-list`; // Saite uz mājasdarbu sarakstu.
 
       for (const memberId of targetGroup.members) {
-        if (memberId.toString() !== req.user.id) { // Don't notify the creator
+        // Nepaziņo pašam mājasdarba veidotājam.
+        if (memberId.toString() !== req.user.id) {
           await createNotification(
             db,
             memberId,
@@ -125,37 +134,38 @@ router.post('/', authMiddleware, async (req, res) => {
     res.status(201).json({ msg: 'Mājasdarbs veiksmīgi pievienots!', homework: createdHomework });
 
   } catch (err) {
-    console.error('Error adding homework:', err);
+    console.error('Kļūda pievienojot mājasdarbu:', err);
     res.status(500).json({ msg: 'Servera kļūda pievienojot mājasdarbu.' });
   }
 });
 
 // @route   GET api/homework
-// @desc    Get all homework relevant to the user (upcoming, sorted by dueDate asc)
-// @access  Private
+// @desc    Iegūst visus lietotājam relevantos mājasdarbus (kārtotus pēc izpildes termiņa augoši).
+// @access  Privāts
 router.get('/', authMiddleware, async (req, res) => {
   try {
     const db = getDB();
     const homeworkCollection = db.collection('homeworks');
-    // const today = new Date(); // Not used for filtering all items
-    // today.setHours(0, 0, 0, 0);
 
-    let initialMatch = {};
+    let initialMatch = {}; // Sākotnējais atlases kritērijs.
+    // Ja lietotājs ir students, atlasa mājasdarbus tikai no grupām, kurās viņš ir reģistrēts.
     if (req.user.role === 'student') {
       const enrolledCustomGroupObjectIds = (req.user.enrolledCustomGroupIds || []).map(id => new ObjectId(id));
+      // Ja students nav nevienā grupā, atgriež tukšu masīvu.
       if (enrolledCustomGroupObjectIds.length === 0) {
         return res.json([]);
       }
       initialMatch = { customGroupId: { $in: enrolledCustomGroupObjectIds } };
     } else if (req.user.role === 'admin') {
-      initialMatch = {};
+      initialMatch = {}; // Administrators redz visus mājasdarbus.
     } else {
       return res.status(403).json({ msg: "Nezināma lietotāja loma." });
     }
 
+    // Izmanto agregāciju, lai pievienotu grupas nosaukumu katram mājasdarbam.
     const homeworks = await homeworkCollection.aggregate([
-      { $match: initialMatch },
-      {
+      { $match: initialMatch }, // Sākotnējā atlase.
+      { // Savieno ar 'groups' kolekciju.
         $lookup: {
           from: 'groups',
           localField: 'customGroupId',
@@ -163,36 +173,38 @@ router.get('/', authMiddleware, async (req, res) => {
           as: 'groupInfo'
         }
       },
-      { $unwind: { path: '$groupInfo', preserveNullAndEmptyArrays: true } },
-      {
+      { $unwind: { path: '$groupInfo', preserveNullAndEmptyArrays: true } }, // Pārvērš `groupInfo` masīvu par objektu.
+      { // Pievieno `customGroupName` lauku.
         $addFields: {
-          customGroupName: { $ifNull: ['$groupInfo.name', 'Nezināma grupa'] }
+          customGroupName: { $ifNull: ['$groupInfo.name', 'Nezināma grupa'] } // Ja grupa nav atrasta, izmanto "Nezināma grupa".
         }
       },
-      { $project: { groupInfo: 0 } }, // fileAttachments field no longer exists or needs projection
-      { $sort: { dueDate: 1, createdAt: -1 } }
+      { $project: { groupInfo: 0 } }, // Noņem lieko `groupInfo` lauku. `fileAttachments` lauks vairs nepastāv.
+      { $sort: { dueDate: 1, createdAt: -1 } } // Kārto pēc izpildes termiņa (augoši), tad pēc izveides laika (dilstoši).
     ]).toArray();
 
     res.json(homeworks);
   } catch (err) {
-    console.error('Error fetching homework:', err);
+    console.error('Kļūda ielādējot mājasdarbus:', err);
     res.status(500).json({ msg: 'Servera kļūda ielādējot mājasdarbus.' });
   }
 });
 
 // @route   GET api/homework/:id
-// @desc    Get a single homework item by ID
-// @access  Private
+// @desc    Iegūst vienu mājasdarba vienumu pēc ID.
+// @access  Privāts
 router.get('/:id', authMiddleware, async (req, res) => {
   try {
     const db = getDB();
     const homeworkCollection = db.collection('homeworks');
 
+    // Pārbauda, vai ID ir derīgs ObjectId formāts.
     if (!ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ msg: 'Nederīgs ID formāts.' });
     }
     const homeworkId = new ObjectId(req.params.id);
 
+    // Agregācija, lai pievienotu grupas nosaukumu.
     const homeworkArray = await homeworkCollection.aggregate([
       { $match: { _id: homeworkId } },
       {
@@ -209,7 +221,7 @@ router.get('/:id', authMiddleware, async (req, res) => {
           customGroupName: { $ifNull: ['$groupInfo.name', 'Nezināma grupa'] }
         }
       },
-      { $project: { groupInfo: 0 } } // fileAttachments field no longer exists or needs projection
+      { $project: { groupInfo: 0 } } // `fileAttachments` lauks vairs nepastāv.
     ]).toArray();
 
     const homework = homeworkArray.length > 0 ? homeworkArray[0] : null;
@@ -218,6 +230,7 @@ router.get('/:id', authMiddleware, async (req, res) => {
       return res.status(404).json({ msg: 'Mājasdarbs nav atrasts.' });
     }
 
+    // Ja lietotājs ir students, pārbauda, vai viņam ir tiesības skatīt šo mājasdarbu (pieder viņa grupai).
     if (req.user.role === 'student') {
       const enrolledCustomGroupIdsStrings = req.user.enrolledCustomGroupIds || [];
       if (!homework.customGroupId || !enrolledCustomGroupIdsStrings.includes(homework.customGroupId.toString())) {
@@ -226,7 +239,7 @@ router.get('/:id', authMiddleware, async (req, res) => {
     }
     res.json(homework);
   } catch (err) {
-    console.error('Error fetching single homework:', err);
+    console.error('Kļūda, ielādējot vienu mājasdarbu:', err);
     if (err.name === 'BSONError') return res.status(400).json({ msg: 'Nederīgs ID formāts.' });
     res.status(500).json({ msg: 'Servera kļūda, ielādējot mājasdarbu.' });
   }
@@ -234,11 +247,11 @@ router.get('/:id', authMiddleware, async (req, res) => {
 
 
 // @route   PUT api/homework/:id
-// @desc    Update a homework assignment
-// @access  Private (only owner or admin)
+// @desc    Atjaunina mājasdarba uzdevumu.
+// @access  Privāts (tikai īpašnieks vai administrators)
 router.put('/:id', authMiddleware, async (req, res) => {
-  // File upload logic removed
-  const { subject, description, dueDate, additionalInfo, links, customGroupId } = req.body; // Removed clearFiles
+  // Failu augšupielādes loģika noņemta.
+  const { subject, description, dueDate, additionalInfo, links, customGroupId } = req.body; // `clearFiles` noņemts.
   const homeworkId = req.params.id;
   const errors = [];
 
@@ -246,6 +259,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
     return res.status(400).json({ msg: 'Nederīgs mājasdarba ID formāts.' });
   }
 
+  // Validācijas.
   if (subject && subject.trim() === '') errors.push('Mācību priekšmets nevar būt tukšs.');
   if (description && description.trim() === '') errors.push('Apraksts nevar būt tukšs.');
   if (dueDate) {
@@ -275,15 +289,18 @@ router.put('/:id', authMiddleware, async (req, res) => {
     const usersCollection = db.collection('users');
     const itemObjectId = new ObjectId(homeworkId);
 
+    // Atrod esošo mājasdarbu.
     const existingHomework = await homeworkCollection.findOne({ _id: itemObjectId });
     if (!existingHomework) {
       return res.status(404).json({ msg: 'Mājasdarbs nav atrasts.' });
     }
 
+    // Pārbauda, vai lietotājam ir tiesības rediģēt.
     if (existingHomework.userId.toString() !== req.user.id && req.user.role !== 'admin') {
       return res.status(403).json({ msg: 'Jums nav tiesību rediģēt šo mājasdarbu.' });
     }
 
+    // Sagatavo atjaunināmos laukus.
     const updateFields = { updatedAt: new Date() };
     if (subject) updateFields.subject = subject;
     if (description) updateFields.description = description;
@@ -291,14 +308,17 @@ router.put('/:id', authMiddleware, async (req, res) => {
     if (typeof additionalInfo !== 'undefined') updateFields.additionalInfo = additionalInfo;
     if (typeof links !== 'undefined') updateFields.links = links ? links.split('\n').map(link => link.trim()).filter(link => link !== '') : [];
 
+    // Pārvalda `customGroupId` maiņu.
     if (customGroupId) {
       if (req.user.role === 'student') {
+        // Students var mainīt grupu tikai uz tām, kurās ir reģistrēts.
         const userCreating = await usersCollection.findOne({ _id: new ObjectId(req.user.id) });
         const enrolledIds = (userCreating.enrolledCustomGroups || []).map(id => id.toString());
         if (!enrolledIds.includes(customGroupId)) {
           return res.status(403).json({ msg: 'Jums nav tiesību pārvietot mājasdarbu uz šo grupu.' });
         }
       } else if (req.user.role === 'admin') {
+        // Administrators var mainīt uz jebkuru eksistējošu grupu.
         const groupExists = await db.collection('groups').findOne({ _id: new ObjectId(customGroupId) });
         if (!groupExists) {
           return res.status(400).json({ msg: 'Norādītā mērķa grupa neeksistē.' });
@@ -307,12 +327,10 @@ router.put('/:id', authMiddleware, async (req, res) => {
       updateFields.customGroupId = new ObjectId(customGroupId);
     }
 
-    // fileAttachments logic removed.
-    // If you want to explicitly remove existing fileAttachments field from DB entries,
-    // you would add `$unset: { fileAttachments: "" }` to updateFields.
-    // For now, we'll just not add/update it.
+    // `fileAttachments` loģika noņemta.
+    // Ja nepieciešams noņemt `fileAttachments` lauku no datubāzes ierakstiem, pievieno `$unset`.
     if (Object.prototype.hasOwnProperty.call(existingHomework, 'fileAttachments')) {
-      updateFields.$unset = { fileAttachments: "" };
+      updateFields.$unset = { fileAttachments: "" }; // Noņem veco lauku.
     }
 
 
@@ -321,6 +339,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
       { $set: updateFields }
     );
 
+    // Iegūst atjaunināto mājasdarbu ar grupas nosaukumu.
     const updatedHomeworkArr = await homeworkCollection.aggregate([
       { $match: { _id: itemObjectId } },
       {
@@ -337,13 +356,13 @@ router.put('/:id', authMiddleware, async (req, res) => {
           customGroupName: { $ifNull: ['$groupInfo.name', 'Nezināma grupa'] }
         }
       },
-      { $project: { groupInfo: 0 } } // fileAttachments field no longer exists or needs projection
+      { $project: { groupInfo: 0 } } // `fileAttachments` lauks vairs nepastāv.
     ]).toArray();
 
     res.json({ msg: 'Mājasdarbs veiksmīgi atjaunināts!', homework: updatedHomeworkArr[0] });
 
   } catch (err) {
-    console.error('Error updating homework:', err);
+    console.error('Kļūda, atjauninot mājasdarbu:', err);
     if (err.name === 'BSONError') return res.status(400).json({ msg: 'Nederīgs ID formāts.' });
     res.status(500).json({ msg: 'Servera kļūda, atjauninot mājasdarbu.' });
   }
@@ -351,8 +370,8 @@ router.put('/:id', authMiddleware, async (req, res) => {
 
 
 // @route   DELETE api/homework/:id
-// @desc    Delete a homework assignment
-// @access  Private (only owner or admin)
+// @desc    Dzēš mājasdarba uzdevumu.
+// @access  Privāts (tikai īpašnieks vai administrators)
 router.delete('/:id', authMiddleware, async (req, res) => {
   const homeworkId = req.params.id;
   try {
@@ -366,38 +385,43 @@ router.delete('/:id', authMiddleware, async (req, res) => {
     const notificationsCollection = db.collection('notifications');
     const itemObjectId = new ObjectId(homeworkId);
 
+    // Atrod dzēšamo mājasdarbu.
     const homeworkToDelete = await homeworkCollection.findOne({ _id: itemObjectId });
     if (!homeworkToDelete) {
       return res.status(404).json({ msg: 'Mājasdarbs nav atrasts.' });
     }
 
+    // Pārbauda tiesības dzēst.
     if (homeworkToDelete.userId.toString() !== req.user.id && req.user.role !== 'admin') {
       return res.status(403).json({ msg: 'Jums nav tiesību dzēst šo mājasdarbu.' });
     }
 
-    // File deletion from storage (GridFS or disk) would go here if it was implemented.
-    // Since we are removing file functionality, this step is not needed for actual files.
+    // Failu dzēšanas loģika no GridFS vai diska šeit būtu, ja tāda būtu implementēta.
+    // Tā kā failu funkcionalitāte ir noņemta, šis solis nav nepieciešams.
 
+    // Dzēš mājasdarbu.
     const deleteResult = await homeworkCollection.deleteOne({ _id: itemObjectId });
     if (deleteResult.deletedCount === 0) {
       return res.status(404).json({ msg: 'Mājasdarbs netika atrasts vai jau ir dzēsts.' });
     }
 
+    // Dzēš saistītos datus: progresu, komentārus, paziņojumus.
     await progressCollection.deleteMany({ itemId: itemObjectId });
     await commentsCollection.deleteMany({ itemId: itemObjectId });
     await notificationsCollection.deleteMany({ relatedItemId: itemObjectId, relatedItemType: 'homework' });
-    // Assuming comments create notifications related to the parent item.
-    // If comments themselves could be 'relatedItemType: comment' this would be more complex.
-    // For now, notifications related to 'COMMENT_ON_OWNED_ITEM' use 'homework' or 'test' as relatedItemType.
-    // So deleting notifications where relatedItemType is 'comment' directly might not be needed
-    // unless comments can be replied to, generating their own direct notifications.
-    // The spec implies comments are on items, so their notifications are tied to item type.
-    // await notificationsCollection.deleteMany({ relatedItemId: itemObjectId, relatedItemType: 'comment' }); // This line might be redundant or for a different feature.
+    // Pieņemot, ka komentāri rada paziņojumus, kas saistīti ar galveno vienumu.
+    // Ja komentāri paši varētu būt 'relatedItemType: comment', tas būtu sarežģītāk.
+    // Pašreiz paziņojumi 'COMMENT_ON_OWNED_ITEM' izmanto 'homework' vai 'test' kā `relatedItemType`.
+    // Tāpēc paziņojumu dzēšana, kur `relatedItemType` ir 'comment', var nebūt nepieciešama,
+    // ja vien komentāriem nevarētu atbildēt, radot savus tiešos paziņojumus.
+    // Specifikācija norāda, ka komentāri ir par vienumiem, tātad to paziņojumi ir saistīti ar vienuma tipu.
+    // Līnija zemāk varētu būt lieka vai paredzēta citai funkcionalitātei.
+    // await notificationsCollection.deleteMany({ relatedItemId: itemObjectId, relatedItemType: 'comment' }); 
 
 
     res.json({ msg: 'Mājasdarbs veiksmīgi dzēsts.' });
   } catch (err) {
-    console.error('Error deleting homework:', err);
+    console.error('Kļūda, dzēšot mājasdarbu:', err);
     res.status(500).json({ msg: 'Servera kļūda, dzēšot mājasdarbu.' });
   }
 });

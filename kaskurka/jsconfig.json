@@ -1,15 +1,17 @@
 {
   "compilerOptions": {
-    "target": "es5",
-    "module": "esnext",
-    "baseUrl": "./",
-    "moduleResolution": "node",
+    "target": "es5", // Nosaka JavaScript versiju, uz kuru kompilēt kodu.
+    "module": "esnext", // Nosaka moduļu sistēmu.
+    "baseUrl": "./", // Bāzes direktorija ceļu aliasiem.
+    "moduleResolution": "node", // Kā moduļi tiek atrasti.
     "paths": {
       "@/*": [
+        // Definē aliasu '@' src direktorijai.
         "src/*"
       ]
     },
     "lib": [
+      // Norāda bibliotēkas, kas jāiekļauj kompilācijā.
       "esnext",
       "dom",
       "dom.iterable",

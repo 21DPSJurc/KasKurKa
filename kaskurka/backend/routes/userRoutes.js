@@ -1,39 +1,40 @@
-// kaskurka/backend/routes/userRoutes.js
 const express = require('express');
 const router = express.Router();
 const { getDB } = require('../config/db');
-const authMiddleware = require('../middleware/authMiddleware');
-const adminMiddleware = require('../middleware/adminMiddleware');
-const { ObjectId } = require('mongodb');
-const bcrypt = require('bcryptjs'); // For potential password changes by admin (if allowed)
+const authMiddleware = require('../middleware/authMiddleware'); // Autentifikācijas starpprogrammatūra.
+const adminMiddleware = require('../middleware/adminMiddleware'); // Administratora tiesību pārbaude.
+const { ObjectId } = require('mongodb'); // MongoDB ObjectId.
+const bcrypt = require('bcryptjs'); // Paroļu šifrēšanai (ja administrators maina paroli).
 
 // @route   GET api/users
-// @desc    Get all users (Admin only)
-// @access  Private (Admin)
+// @desc    Iegūst visus lietotājus (tikai administrators).
+// @access  Privāts (Administrators)
 router.get('/', [authMiddleware, adminMiddleware], async (req, res) => {
     try {
         const db = getDB();
         const usersCollection = db.collection('users');
-        // Exclude password from the returned user objects
+        // Atlasa visus lietotājus, izslēdzot paroles lauku, kārtotus pēc uzvārda un vārda.
         const users = await usersCollection.find({}).project({ password: 0 }).sort({ lastName: 1, firstName: 1 }).toArray();
         res.json(users);
     } catch (err) {
-        console.error('Error fetching users:', err);
+        console.error('Kļūda, ielādējot lietotājus:', err);
         res.status(500).json({ msg: 'Servera kļūda, ielādējot lietotājus.' });
     }
 });
 
 // @route   GET api/users/:userId
-// @desc    Get a specific user by ID (Admin only)
-// @access  Private (Admin)
+// @desc    Iegūst konkrētu lietotāju pēc ID (tikai administrators).
+// @access  Privāts (Administrators)
 router.get('/:userId', [authMiddleware, adminMiddleware], async (req, res) => {
-    const { userId } = req.params;
+    const { userId } = req.params; // Lietotāja ID no URL.
+    // Pārbauda, vai ID ir derīgs ObjectId formāts.
     if (!ObjectId.isValid(userId)) {
         return res.status(400).json({ msg: 'Nederīgs lietotāja ID.' });
     }
     try {
         const db = getDB();
         const usersCollection = db.collection('users');
+        // Atrod lietotāju pēc ID, izslēdzot paroles lauku.
         const user = await usersCollection.findOne({ _id: new ObjectId(userId) }, { projection: { password: 0 } });
 
         if (!user) {
@@ -41,30 +42,31 @@ router.get('/:userId', [authMiddleware, adminMiddleware], async (req, res) => {
         }
         res.json(user);
     } catch (err) {
-        console.error('Error fetching user by ID:', err);
+        console.error('Kļūda, ielādējot lietotāja datus pēc ID:', err);
         res.status(500).json({ msg: 'Servera kļūda, ielādējot lietotāja datus.' });
     }
 });
 
 // @route   PUT api/users/:userId
-// @desc    Update a user's details (Admin only)
-// @access  Private (Admin)
+// @desc    Atjaunina lietotāja datus (tikai administrators).
+// @access  Privāts (Administrators)
 router.put('/:userId', [authMiddleware, adminMiddleware], async (req, res) => {
     const { userId } = req.params;
-    const { firstName, lastName, email, role, studyStartYear, group, /*subgroup,*/ newPassword } = req.body; // subgroup removed
+    // `subgroup` lauks ir noņemts.
+    const { firstName, lastName, email, role, studyStartYear, group, newPassword } = req.body;
 
     if (!ObjectId.isValid(userId)) {
         return res.status(400).json({ msg: 'Nederīgs lietotāja ID.' });
     }
 
-    // Basic validation
+    // Pamata validācija.
     if (!firstName || !lastName || !email || !role || !studyStartYear || !group) {
         return res.status(400).json({ msg: 'Lūdzu, aizpildiet visus obligātos laukus (Vārds, Uzvārds, E-pasts, Loma, Mācību s. gads, Grupa).' });
     }
     if (!['student', 'admin'].includes(role)) {
         return res.status(400).json({ msg: 'Nederīga loma. Atļautās lomas: student, admin.' });
     }
-    // Password complexity check if newPassword is provided
+    // Paroles sarežģītības pārbaude, ja tiek norādīta jauna parole.
     if (newPassword) {
         const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
         if (!passwordRegex.test(newPassword)) {
@@ -80,20 +82,22 @@ router.put('/:userId', [authMiddleware, adminMiddleware], async (req, res) => {
         const usersCollection = db.collection('users');
         const userObjectId = new ObjectId(userId);
 
+        // Atrod lietotāju, kuru paredzēts atjaunināt.
         const userToUpdate = await usersCollection.findOne({ _id: userObjectId });
         if (!userToUpdate) {
             return res.status(404).json({ msg: 'Lietotājs nav atrasts.' });
         }
 
-        // Check if new email conflicts with another existing user (excluding itself)
+        // Pārbauda, vai jaunais e-pasts (ja mainīts) nekonfliktē ar citu esošu lietotāju.
         const conflictingUser = await usersCollection.findOne({
             email: email.toLowerCase(),
-            _id: { $ne: userObjectId }
+            _id: { $ne: userObjectId } // Izslēdz pašu rediģējamo lietotāju.
         });
         if (conflictingUser) {
             return res.status(400).json({ msg: 'Lietotājs ar šādu e-pastu jau eksistē.' });
         }
 
+        // Sagatavo laukus atjaunināšanai.
         const updateFields = {
             firstName,
             lastName,
@@ -101,51 +105,56 @@ router.put('/:userId', [authMiddleware, adminMiddleware], async (req, res) => {
             role,
             studyStartYear: parseInt(studyStartYear, 10),
             group,
-            // subgroup: subgroup || '', // subgroup removed
+            // `subgroup` lauks noņemts.
             updatedAt: new Date(),
         };
 
-        // Ensure subgroup is removed if it exists
+        // Nodrošina, ka `subgroup` lauks tiek noņemts, ja tas eksistē vecajā dokumentā.
         if (Object.prototype.hasOwnProperty.call(userToUpdate, 'subgroup')) {
             updateFields.$unset = { subgroup: "" };
         }
 
 
+        // Ja norādīta jauna parole, to šifrē un pievieno atjaunināmajiem laukiem.
         if (newPassword) {
             const salt = await bcrypt.genSalt(10);
             updateFields.password = await bcrypt.hash(newPassword, salt);
         }
 
 
+        // Atjaunina lietotāja datus datubāzē.
         const result = await usersCollection.updateOne(
             { _id: userObjectId },
             { $set: updateFields }
         );
 
         if (result.matchedCount === 0) {
+            // Maz ticams, ja `userToUpdate` tika atrasts.
             return res.status(404).json({ msg: 'Lietotājs netika atrasts atjaunināšanai.' });
         }
 
-        const updatedUser = await usersCollection.findOne({ _id: userObjectId }, { projection: { password: 0 } }); // Fetch updated user without password
+        // Iegūst atjaunināto lietotāju (bez paroles) atbildes nosūtīšanai.
+        const updatedUser = await usersCollection.findOne({ _id: userObjectId }, { projection: { password: 0 } });
         res.json({ msg: 'Lietotāja dati veiksmīgi atjaunināti!', user: updatedUser });
 
     } catch (err) {
-        console.error('Error updating user:', err);
+        console.error('Kļūda, atjauninot lietotāju:', err);
         res.status(500).json({ msg: 'Servera kļūda, atjauninot lietotāja datus.' });
     }
 });
 
 // @route   DELETE api/users/:userId
-// @desc    Delete a user (Admin only)
-// @access  Private (Admin)
+// @desc    Dzēš lietotāju (tikai administrators).
+// @access  Privāts (Administrators)
 router.delete('/:userId', [authMiddleware, adminMiddleware], async (req, res) => {
-    const { userId } = req.params;
+    const { userId } = req.params; // Dzēšamā lietotāja ID.
 
     if (!ObjectId.isValid(userId)) {
         return res.status(400).json({ msg: 'Nederīgs lietotāja ID.' });
     }
-    const adminUserId = req.user.id; // ID of the admin performing the action
+    const adminUserId = req.user.id; // Administratora ID, kas veic darbību.
 
+    // Pārbauda, vai administrators nemēģina dzēst pats sevi.
     if (userId === adminUserId) {
         return res.status(400).json({ msg: 'Administrators nevar dzēst pats sevi.' });
     }
@@ -155,41 +164,44 @@ router.delete('/:userId', [authMiddleware, adminMiddleware], async (req, res) =>
         const usersCollection = db.collection('users');
         const userObjectId = new ObjectId(userId);
 
+        // Atrod dzēšamo lietotāju.
         const userToDelete = await usersCollection.findOne({ _id: userObjectId });
         if (!userToDelete) {
             return res.status(404).json({ msg: 'Lietotājs nav atrasts.' });
         }
 
-        // Potential cascading deletions or cleanups:
-        // 1. Remove user from group.members arrays
+        // Iespējamās kaskādes dzēšanas vai "attīrīšanas" darbības:
+        // 1. Noņemt lietotāju no `group.members` masīviem.
         await db.collection('groups').updateMany(
             { members: userObjectId },
             { $pull: { members: userObjectId } }
         );
-        // 2. Delete user's group applications
+        // 2. Dzēst lietotāja grupu pieteikumus.
         await db.collection('groupApplications').deleteMany({ userId: userObjectId });
-        // 3. Delete user's item progress
+        // 3. Dzēst lietotāja vienumu progresu.
         await db.collection('userItemProgress').deleteMany({ userId: userObjectId });
-        // 4. Handle user's comments (e.g., anonymize, mark as deleted user, or delete)
-        // For now, let's just mark comments with a flag or change userName
+        // 4. Apstrādāt lietotāja komentārus (piem., anonimizēt, atzīmēt kā dzēsta lietotāja komentārus vai dzēst).
+        // Pagaidām anonimizējam, nomainot `userName` un saglabājot sākotnējo ID, `userId` iestatot uz `null`.
         await db.collection('comments').updateMany(
             { userId: userObjectId },
-            { $set: { userName: `${userToDelete.firstName} (Dzēsts Lietotājs)`, originalUserId: userToDelete._id, userId: null } } // Anonymize
+            { $set: { userName: `${userToDelete.firstName} (Dzēsts Lietotājs)`, originalUserId: userToDelete._id, userId: null } }
         );
-        // 5. Handle user's created homework/tests (e.g., assign to a generic admin, mark as orphaned, or delete)
-        // For now, let's assume for now that content created by users remains, attributed to their name.
-        // If stricter deletion is needed, that would be more complex.
+        // 5. Apstrādāt lietotāja izveidotos mājasdarbus/pārbaudes darbus (piem., piešķirt vispārīgam administratoram, atzīmēt kā "bāreņus" vai dzēst).
+        // Pagaidām pieņemam, ka lietotāju izveidotais saturs paliek, attiecināts uz viņu vārdu.
+        // Ja nepieciešama stingrāka dzēšana, tas būtu sarežģītāk.
 
 
+        // Dzēš pašu lietotāju.
         const deleteResult = await usersCollection.deleteOne({ _id: userObjectId });
         if (deleteResult.deletedCount === 0) {
+            // Maz ticams, ja `userToDelete` tika atrasts.
             return res.status(404).json({ msg: 'Lietotāju neizdevās dzēst vai tas jau ir dzēsts.' });
         }
 
         res.json({ msg: `Lietotājs ${userToDelete.firstName} ${userToDelete.lastName} veiksmīgi dzēsts.` });
 
     } catch (err) {
-        console.error('Error deleting user:', err);
+        console.error('Kļūda, dzēšot lietotāju:', err);
         res.status(500).json({ msg: 'Servera kļūda, dzēšot lietotāju.' });
     }
 });

@@ -2,16 +2,17 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { getDB } = require('../config/db');
-const { ObjectId } = require('mongodb'); // Added ObjectId
+const { ObjectId } = require('mongodb'); // Pievieno ObjectId MongoDB identifikatoriem.
 const path = require('path');
+// Ielādē vides mainīgos no .env faila.
 require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
-const authMiddleware = require('../middleware/authMiddleware'); // For the new /me/refresh route
+const authMiddleware = require('../middleware/authMiddleware'); // Autentifikācijas starpprogrammatūra jaunajam /me/refresh maršrutam.
 
-const router = express.Router();
+const router = express.Router(); // Izveido jaunu maršrutētāja instanci.
 
 // @route   POST api/auth/register
-// @desc    Register a new user
-// @access  Public
+// @desc    Reģistrē jaunu lietotāju.
+// @access  Publisks
 router.post('/register', async (req, res) => {
   const {
     firstName,
@@ -20,12 +21,14 @@ router.post('/register', async (req, res) => {
     password,
     studyStartYear,
     group,
-  } = req.body;
+  } = req.body; // Iegūst datus no pieprasījuma ķermeņa.
 
+  // Pārbauda, vai visi obligātie lauki ir aizpildīti.
   if (!firstName || !lastName || !email || !password || !studyStartYear || !group) {
     return res.status(400).json({ msg: 'Lūdzu, aizpildiet visus obligātos laukus.' });
   }
 
+  // Paroles sarežģītības pārbaude.
   const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
   if (!passwordRegex.test(password)) {
     return res.status(400).json({
@@ -34,31 +37,36 @@ router.post('/register', async (req, res) => {
   }
 
   try {
-    const db = getDB();
-    const usersCollection = db.collection('users');
+    const db = getDB(); // Iegūst datubāzes instanci.
+    const usersCollection = db.collection('users'); // Iegūst 'users' kolekciju.
 
+    // Pārbauda, vai lietotājs ar šādu e-pastu jau eksistē.
     let userCheck = await usersCollection.findOne({ email: email.toLowerCase() });
     if (userCheck) {
       return res.status(400).json({ msg: 'Lietotājs ar šādu e-pastu jau eksistē.' });
     }
 
+    // Izveido jauna lietotāja objektu.
     const newUser = {
       firstName,
       lastName,
-      email: email.toLowerCase(),
-      password,
-      studyStartYear: parseInt(studyStartYear, 10),
-      group, // This is the display group from registration
-      createdAt: new Date(),
-      role: 'student',
-      enrolledCustomGroups: [], // Initialize as empty array
+      email: email.toLowerCase(), // E-pastu glabā mazajiem burtiem, lai nodrošinātu unikalitāti.
+      password, // Parole tiks šifrēta tālāk.
+      studyStartYear: parseInt(studyStartYear, 10), // Pārvērš studiju sākuma gadu par skaitli.
+      group, // Reģistrācijas grupa.
+      createdAt: new Date(), // Reģistrācijas datums.
+      role: 'student', // Noklusējuma loma jaunam lietotājam.
+      enrolledCustomGroups: [], // Inicializē pielāgoto grupu sarakstu kā tukšu masīvu.
     };
 
+    // Šifrē paroli.
     const salt = await bcrypt.genSalt(10);
     newUser.password = await bcrypt.hash(password, salt);
 
+    // Ievieto jauno lietotāju datubāzē.
     const result = await usersCollection.insertOne(newUser);
 
+    // Sagatavo reģistrētā lietotāja datus atbildes nosūtīšanai (bez paroles).
     const registeredUser = {
       _id: result.insertedId,
       firstName: newUser.firstName,
@@ -74,18 +82,19 @@ router.post('/register', async (req, res) => {
     res.status(201).json({ msg: 'Reģistrācija veiksmīga!', user: registeredUser });
 
   } catch (err) {
-    console.error('Registration error:', err.message);
+    console.error('Reģistrācijas kļūda:', err.message);
     res.status(500).send('Servera kļūda');
   }
 });
 
 
 // @route   POST api/auth/login
-// @desc    Authenticate user & get token
-// @access  Public
+// @desc    Autentificē lietotāju un saņem pilnvaru (token).
+// @access  Publisks
 router.post('/login', async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password } = req.body; // Iegūst e-pastu un paroli no pieprasījuma.
 
+  // Pārbauda, vai e-pasts un parole ir ievadīti.
   if (!email || !password) {
     return res.status(400).json({ msg: 'Lūdzu, ievadiet e-pastu un paroli.' });
   }
@@ -94,44 +103,52 @@ router.post('/login', async (req, res) => {
     const db = getDB();
     const usersCollection = db.collection('users');
 
+    // Atrod lietotāju pēc e-pasta.
     const user = await usersCollection.findOne({ email: email.toLowerCase() });
     if (!user) {
       return res.status(400).json({ msg: 'Nepareizs e-pasts vai parole.' });
     }
 
+    // Salīdzina ievadīto paroli ar datubāzē saglabāto šifrēto paroli.
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(400).json({ msg: 'Nepareizs e-pasts vai parole.' });
     }
 
-    // Prepare enrolledCustomGroupsDetails for the HTTP response
+    // Sagatavo informāciju par lietotāja pielāgotajām grupām HTTP atbildei.
     let enrolledCustomGroupsDetails = [];
     if (user.enrolledCustomGroups && user.enrolledCustomGroups.length > 0) {
+      // Pārvērš grupu ID virknes par ObjectId objektiem vaicājumam.
       const groupObjectIds = user.enrolledCustomGroups.map(id => new ObjectId(id));
+      // Iegūst grupu nosaukumus un ID, lai tos varētu parādīt lietotāja saskarnē.
       enrolledCustomGroupsDetails = await db.collection('groups')
         .find({ _id: { $in: groupObjectIds } })
-        .project({ name: 1, _id: 1 }) // Only need ID and name for frontend display
+        .project({ name: 1, _id: 1 }) // Atlasa tikai ID un nosaukumu.
         .toArray();
     }
 
+    // Sagatavo datus JWT pilnvarai.
     const payload = {
       user: {
-        id: user._id.toString(), // Ensure ID is string for JWT
+        id: user._id.toString(), // Pārliecinās, ka ID ir virkne priekš JWT.
         email: user.email,
         role: user.role,
         firstName: user.firstName,
         studyStartYear: user.studyStartYear,
-        group: user.group, // Registration group
-        enrolledCustomGroupIds: user.enrolledCustomGroups ? user.enrolledCustomGroups.map(id => id.toString()) : [], // Store IDs in JWT
+        group: user.group, // Lietotāja reģistrācijas grupa.
+        // Saglabā pielāgoto grupu ID kā virknes JWT pilnvarā.
+        enrolledCustomGroupIds: user.enrolledCustomGroups ? user.enrolledCustomGroups.map(id => id.toString()) : [],
       },
     };
 
+    // Paraksta JWT pilnvaru.
     jwt.sign(
       payload,
-      process.env.JWT_SECRET,
-      { expiresIn: '5h' },
+      process.env.JWT_SECRET, // Slepenā atslēga no .env faila.
+      { expiresIn: '5h' }, // Pilnvaras derīguma termiņš.
       (err, token) => {
         if (err) throw err;
+        // Nosūta pilnvaru un lietotāja datus klientam.
         res.json({
           token,
           user: {
@@ -140,70 +157,73 @@ router.post('/login', async (req, res) => {
             lastName: user.lastName,
             email: user.email,
             studyStartYear: user.studyStartYear,
-            group: user.group, // Registration group
+            group: user.group, // Reģistrācijas grupa.
             role: user.role,
             createdAt: user.createdAt,
-            enrolledCustomGroups: user.enrolledCustomGroups ? user.enrolledCustomGroups.map(id => id.toString()) : [], // IDs for consistency
-            enrolledCustomGroupsDetails: enrolledCustomGroupsDetails, // Detailed objects for frontend
+            // Pielāgoto grupu ID (kā virknes) konsekvencei.
+            enrolledCustomGroups: user.enrolledCustomGroups ? user.enrolledCustomGroups.map(id => id.toString()) : [],
+            enrolledCustomGroupsDetails: enrolledCustomGroupsDetails, // Detalizēti objekti lietotāja saskarnei.
           }
         });
       }
     );
   } catch (err) {
-    console.error('Login error:', err.message);
+    console.error('Pieslēgšanās kļūda:', err.message);
     res.status(500).send('Servera kļūda');
   }
 });
 
 
 // @route   GET api/auth/me/refresh
-// @desc    Get current user's fresh data
-// @access  Private
+// @desc    Iegūst aktuālos pašreizējā lietotāja datus.
+// @access  Privāts (nepieciešama autorizācija)
 router.get('/me/refresh', authMiddleware, async (req, res) => {
   try {
     const db = getDB();
     const usersCollection = db.collection('users');
-    const userId = new ObjectId(req.user.id);
+    const userId = new ObjectId(req.user.id); // Lietotāja ID no autentifikācijas pilnvaras.
 
+    // Atrod lietotāju datubāzē pēc ID.
     const user = await usersCollection.findOne({ _id: userId });
 
     if (!user) {
-      // This case should ideally be caught by authMiddleware if user doesn't exist
-      // But as a safeguard:
+      // Šis gadījums ideāli būtu jānoķer authMiddleware, ja lietotājs neeksistē.
+      // Tomēr, kā papildu drošības pārbaude:
       return res.status(404).json({ msg: 'Lietotājs nav atrasts.' });
     }
 
-    // Prepare enrolledCustomGroupsDetails for the HTTP response
+    // Sagatavo informāciju par lietotāja pielāgotajām grupām HTTP atbildei.
     let enrolledCustomGroupsDetails = [];
     if (user.enrolledCustomGroups && user.enrolledCustomGroups.length > 0) {
-      const groupObjectIds = user.enrolledCustomGroups.map(id => new ObjectId(id.toString())); // Ensure they are ObjectIds
+      // Pārliecinās, ka grupu ID ir ObjectId objekti.
+      const groupObjectIds = user.enrolledCustomGroups.map(id => new ObjectId(id.toString()));
       enrolledCustomGroupsDetails = await db.collection('groups')
         .find({ _id: { $in: groupObjectIds } })
-        .project({ name: 1, _id: 1 }) // Only need ID and name
+        .project({ name: 1, _id: 1 }) // Atlasa tikai ID un nosaukumu.
         .toArray();
     }
 
-    // Construct the user object to be returned, similar to login
+    // Konstruē lietotāja objektu, kas tiks atgriezts (līdzīgi kā pieslēgšanās gadījumā).
     const refreshedUserObject = {
       id: user._id.toString(),
       firstName: user.firstName,
       lastName: user.lastName,
       email: user.email,
       studyStartYear: user.studyStartYear,
-      group: user.group, // Registration group
+      group: user.group, // Reģistrācijas grupa.
       role: user.role,
       createdAt: user.createdAt,
-      // Ensure enrolledCustomGroups are strings of IDs
+      // Pārliecinās, ka pielāgoto grupu ID ir virknes.
       enrolledCustomGroups: user.enrolledCustomGroups ? user.enrolledCustomGroups.map(id => id.toString()) : [],
       enrolledCustomGroupsDetails: enrolledCustomGroupsDetails,
     };
 
-    res.json(refreshedUserObject);
+    res.json(refreshedUserObject); // Nosūta atjaunotos lietotāja datus.
 
   } catch (err) {
-    console.error('Error refreshing user data:', err);
+    console.error('Kļūda, atjaunojot lietotāja datus:', err);
     res.status(500).send('Servera kļūda, mēģinot atjaunot lietotāja datus.');
   }
 });
 
-module.exports = router;
+module.exports = router; // Eksportē maršrutētāju.

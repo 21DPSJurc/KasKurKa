@@ -1,76 +1,80 @@
-// kaskurka/backend/routes/progressRoutes.js
 const express = require('express');
 const router = express.Router();
 const { getDB } = require('../config/db');
-const authMiddleware = require('../middleware/authMiddleware');
-const { ObjectId } = require('mongodb');
+const authMiddleware = require('../middleware/authMiddleware'); // Autentifikācijas starpprogrammatūra.
+const { ObjectId } = require('mongodb'); // MongoDB ObjectId.
 
 // @route   POST api/progress
-// @desc    Set or update progress status for an item (homework or test)
-// @access  Private
+// @desc    Iestata vai atjaunina progresa statusu vienumam (mājasdarbam vai pārbaudes darbam).
+// @access  Privāts
 router.post('/', authMiddleware, async (req, res) => {
-  const { itemId, status } = req.body; // status can be 'done' or 'not_done' (or boolean true/false)
-  const userId = new ObjectId(req.user.id);
+  const { itemId, status } = req.body; // `status` var būt 'done' vai 'not_done' (vai paties/aplams).
+  const userId = new ObjectId(req.user.id); // Lietotāja ID.
 
+  // Pārbauda, vai ir norādīts vienuma ID un statuss.
   if (!itemId || typeof status === 'undefined') {
-    return res.status(400).json({ msg: 'Nepieciešams ID un statuss.' }); // Item ID and status are required
+    return res.status(400).json({ msg: 'Nepieciešams ID un statuss.' });
   }
 
   try {
     const db = getDB();
-    const progressCollection = db.collection('userItemProgress');
+    const progressCollection = db.collection('userItemProgress'); // Kolekcija lietotāju progresam.
 
-    // Validate itemId (optional, but good practice)
-    // Check if item actually exists in homeworks or tests collection
-    // For now, we'll assume itemId is valid if provided.
+    // Papildu validācija (neobligāta, bet ieteicama):
+    // Pārbaudīt, vai vienums ar `itemId` patiešām eksistē `homeworks` vai `tests` kolekcijā.
+    // Pagaidām pieņemam, ka `itemId` ir derīgs, ja tas ir norādīts.
 
-    const itemObjectId = new ObjectId(itemId);
+    const itemObjectId = new ObjectId(itemId); // Pārvērš vienuma ID par ObjectId.
 
+    // Atjaunina vai izveido (upsert) progresa ierakstu.
     const result = await progressCollection.updateOne(
-      { userId: userId, itemId: itemObjectId },
-      { $set: { status: status, updatedAt: new Date() } },
-      { upsert: true } // Creates the document if it doesn't exist
+      { userId: userId, itemId: itemObjectId }, // Meklēšanas kritēriji.
+      { $set: { status: status, updatedAt: new Date() } }, // Atjaunināmie lauki.
+      { upsert: true } // Ja ieraksts neeksistē, to izveido.
     );
 
+    // Pārbauda, vai ieraksts tika modificēts vai izveidots.
     if (result.modifiedCount > 0 || result.upsertedCount > 0) {
       res.json({ msg: 'Progresa statuss veiksmīgi atjaunināts.', itemId, status });
     } else {
-      // This case might happen if the status submitted is the same as already in DB
-      // and no upsert happened. Still a success in terms of state.
+      // Šis gadījums var notikt, ja iesniegtais statuss ir tāds pats kā jau datubāzē
+      // un `upsert` nenotika. Tomēr tas joprojām ir veiksmīgs stāvokļa ziņā.
       res.json({ msg: 'Progresa statuss jau bija aktuāls.', itemId, status });
     }
 
   } catch (err) {
-    console.error('Error updating progress:', err);
+    console.error('Kļūda, atjauninot progresu:', err);
+    // Specifiska kļūdas apstrāde nederīgam ObjectId formātam.
     if (err.name === 'BSONError' && err.message.includes('Argument passed in must be a string of 12 bytes or a string of 24 hex characters or an integer')) {
-        return res.status(400).json({ msg: 'Nederīgs vienuma ID formāts.' });
+      return res.status(400).json({ msg: 'Nederīgs vienuma ID formāts.' });
     }
     res.status(500).json({ msg: 'Servera kļūda atjauninot progresu.' });
   }
 });
 
 // @route   GET api/progress
-// @desc    Get all progress statuses for the logged-in user
-// @access  Private
+// @desc    Iegūst visus progresa statusus pieslēgtajam lietotājam.
+// @access  Privāts
 router.get('/', authMiddleware, async (req, res) => {
-  const userId = new ObjectId(req.user.id);
+  const userId = new ObjectId(req.user.id); // Lietotāja ID.
 
   try {
     const db = getDB();
     const progressCollection = db.collection('userItemProgress');
 
+    // Atrod visus progresa ierakstus šim lietotājam.
     const userProgress = await progressCollection.find({ userId: userId }).toArray();
-    
-    // Convert to a map for easier lookup on the frontend: { itemId: status }
+
+    // Pārveido rezultātu par karti (map) ērtākai lietošanai lietotāja saskarnē: { itemId: status }.
     const progressMap = userProgress.reduce((acc, curr) => {
-      acc[curr.itemId.toString()] = curr.status;
+      acc[curr.itemId.toString()] = curr.status; // Atslēga ir vienuma ID (kā virkne).
       return acc;
     }, {});
 
     res.json(progressMap);
 
   } catch (err) {
-    console.error('Error fetching progress:', err);
+    console.error('Kļūda, ielādējot progresu:', err);
     res.status(500).json({ msg: 'Servera kļūda ielādējot progresu.' });
   }
 });
