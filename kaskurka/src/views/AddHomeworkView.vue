@@ -148,78 +148,7 @@
         ></textarea>
       </div>
 
-      <div class="form-group">
-        <label for="files"
-          ><i class="fas fa-folder-open form-icon"></i> Pievienot Failus (līdz 5
-          failiem, katrs līdz 5MB):</label
-        >
-        <input
-          type="file"
-          id="files"
-          @change="handleFileUpload"
-          multiple
-          :disabled="isLoading"
-          accept=".pdf,.doc,.docx,.zip,image/*,.txt,.ppt,.pptx,.xls,.xlsx,.rar"
-          class="file-input-styled"
-        />
-        <small v-if="itemIdToEdit" class="info-text"
-          ><i class="fas fa-info-circle"></i> Pievienojot jaunus failus, tie
-          aizstās esošos.</small
-        >
-
-        <div
-          v-if="
-            itemIdToEdit &&
-            homework.existingFileAttachments &&
-            homework.existingFileAttachments.length > 0 &&
-            !newFilesSelected
-          "
-          class="existing-files-display"
-        >
-          <strong><i class="fas fa-archive"></i> Esošie faili:</strong>
-          <ul class="file-list">
-            <li
-              v-for="(file, index) in homework.existingFileAttachments"
-              :key="index"
-              class="file-list-item existing"
-            >
-              <i class="fas fa-file"></i> {{ file.originalName }}
-              <span class="file-size"
-                >({{ (file.size / 1024).toFixed(2) }} KB)</span
-              >
-            </li>
-          </ul>
-          <label class="clear-files-label"
-            ><input
-              type="checkbox"
-              v-model="clearExistingFiles"
-              :disabled="isLoading"
-            />
-            Dzēst visus esošos failus</label
-          >
-        </div>
-
-        <div
-          v-if="homework.selectedFileObjects.length > 0"
-          class="selected-files-display"
-        >
-          <strong
-            ><i class="fas fa-folder-plus"></i> Atlasītie jaunie faili:</strong
-          >
-          <ul class="file-list">
-            <li
-              v-for="(file, index) in homework.selectedFileObjects"
-              :key="index"
-              class="file-list-item new"
-            >
-              <i class="fas fa-file-medical"></i> {{ file.name }}
-              <span class="file-size"
-                >({{ (file.size / 1024).toFixed(2) }} KB)</span
-              >
-            </li>
-          </ul>
-        </div>
-      </div>
+      <!-- File upload section removed -->
 
       <div v-if="successMessage" class="success-message">
         <i class="fas fa-check-circle"></i> {{ successMessage }}
@@ -262,8 +191,6 @@
 </template>
 
 <script>
-// Script section remains largely the same as provided in the previous step
-// Only minor adjustments for consistency if needed
 import axios from "axios";
 
 export default {
@@ -292,8 +219,8 @@ export default {
         dueDate: `${year}-${month}-${day}`,
         additionalInfo: "",
         links: "",
-        selectedFileObjects: [],
-        existingFileAttachments: [],
+        // selectedFileObjects removed
+        // existingFileAttachments removed
         customGroupId: "",
       },
       today: `${year}-${month}-${day}`,
@@ -301,8 +228,8 @@ export default {
       successMessage: "",
       isLoading: false,
       isLoadingInitialData: false,
-      newFilesSelected: false,
-      clearExistingFiles: false,
+      // newFilesSelected removed
+      // clearExistingFiles removed
       allSystemGroups: [],
     };
   },
@@ -393,9 +320,8 @@ export default {
     },
     async fetchAllSystemGroups() {
       if (this.currentUser && this.currentUser.role === "admin") {
-        if (this.allSystemGroups.length > 0 && !this.itemIdToEdit) {
-          /* simple cache */
-        }
+        // Simple cache check, could be more sophisticated
+        // if (this.allSystemGroups.length > 0 && !this.itemIdToEdit) return;
 
         try {
           const response = await axios.get("/api/groups");
@@ -417,18 +343,17 @@ export default {
         dueDate: `${year}-${month}-${day}`,
         additionalInfo: "",
         links: "",
-        selectedFileObjects: [],
-        existingFileAttachments: [],
+        // selectedFileObjects: [], // Removed
+        // existingFileAttachments: [], // Removed
         customGroupId:
           this.availableCustomGroups.length === 1
             ? this.availableCustomGroups[0]._id
             : "",
       };
-      this.newFilesSelected = false;
-      this.clearExistingFiles = false;
+      // this.newFilesSelected = false; // Removed
+      // this.clearExistingFiles = false; // Removed
       this.successMessage = "";
-      const fileInput = document.getElementById("files");
-      if (fileInput) fileInput.value = null;
+      // File input reset not needed
     },
     async loadHomeworkForEditing(itemId) {
       this.isLoading = true;
@@ -443,13 +368,13 @@ export default {
           : this.today;
         this.homework.additionalInfo = data.additionalInfo || "";
         this.homework.links = data.links ? data.links.join("\n") : "";
-        this.homework.existingFileAttachments = data.fileAttachments || [];
+        // this.homework.existingFileAttachments = data.fileAttachments || []; // Removed
         this.homework.customGroupId = data.customGroupId
           ? data.customGroupId.toString()
           : "";
-        this.homework.selectedFileObjects = [];
-        this.newFilesSelected = false;
-        this.clearExistingFiles = false;
+        // this.homework.selectedFileObjects = []; // Removed
+        // this.newFilesSelected = false; // Removed
+        // this.clearExistingFiles = false; // Removed
       } catch (error) {
         console.error("Error loading homework for editing:", error);
         this.errorMessage =
@@ -473,46 +398,14 @@ export default {
     cancelEdit() {
       this.$emit("cancelEdit");
     },
-    handleFileUpload(event) {
-      this.homework.selectedFileObjects = Array.from(event.target.files);
-      this.newFilesSelected = this.homework.selectedFileObjects.length > 0;
-      // Keep existing general error message, but clear file-specific ones.
+    // handleFileUpload removed
+    validateClientSideForm() {
+      // Clear previous general validation messages
       if (
         this.errorMessage &&
-        (this.errorMessage.startsWith("Jūs varat") ||
-          this.errorMessage.startsWith("Fails"))
-      ) {
-        this.errorMessage = "";
-      }
-      this.successMessage = "";
-
-      const MAX_TOTAL_FILES = 5;
-      if (this.homework.selectedFileObjects.length > MAX_TOTAL_FILES) {
-        this.errorMessage = `Jūs varat pievienot ne vairāk kā ${MAX_TOTAL_FILES} failus.`;
-        this.homework.selectedFileObjects = [];
-        event.target.value = null;
-        this.newFilesSelected = false;
-        return;
-      }
-      for (const file of this.homework.selectedFileObjects) {
-        if (file.size > 5 * 1024 * 1024) {
-          this.errorMessage = `Fails "${file.name}" ir pārāk liels (Maks. 5MB).`;
-          this.homework.selectedFileObjects =
-            this.homework.selectedFileObjects.filter(
-              (f) => f.name !== file.name
-            );
-          if (this.homework.selectedFileObjects.length === 0) {
-            event.target.value = null;
-            this.newFilesSelected = false;
-          }
-          return;
-        }
-      }
-    },
-    validateClientSideForm() {
-      if (
-        (this.errorMessage && this.errorMessage.startsWith("Lūdzu")) ||
-        this.errorMessage.startsWith("Saite")
+        (this.errorMessage.startsWith("Lūdzu") ||
+          this.errorMessage.startsWith("Saite") ||
+          this.errorMessage.includes("rakstzīmes"))
       ) {
         this.errorMessage = "";
       }
@@ -566,48 +459,39 @@ export default {
       if (!this.validateClientSideForm()) return;
 
       this.isLoading = true;
+      // Clear previous general validation errors if any were related to now-removed file logic
       if (
         this.errorMessage &&
         (this.errorMessage.startsWith("Lūdzu") ||
           this.errorMessage.startsWith("Saite") ||
-          this.errorMessage.startsWith("Jūs varat") ||
-          this.errorMessage.startsWith("Fails") ||
+          this.errorMessage.startsWith("Jūs varat") || // Example file error
+          this.errorMessage.startsWith("Fails") || // Example file error
           this.errorMessage.includes("rakstzīmes"))
       ) {
         this.errorMessage = "";
       }
       this.successMessage = "";
 
-      const formData = new FormData();
-      formData.append("customGroupId", this.homework.customGroupId);
-      formData.append("subject", this.homework.subject);
-      formData.append("description", this.homework.description);
-      formData.append("dueDate", this.homework.dueDate);
-      formData.append("additionalInfo", this.homework.additionalInfo);
-      formData.append("links", this.homework.links);
+      const homeworkData = {
+        customGroupId: this.homework.customGroupId,
+        subject: this.homework.subject,
+        description: this.homework.description,
+        dueDate: this.homework.dueDate,
+        additionalInfo: this.homework.additionalInfo,
+        links: this.homework.links,
+      };
 
-      if (this.newFilesSelected) {
-        for (const file of this.homework.selectedFileObjects) {
-          formData.append("files", file);
-        }
-      } else if (this.itemIdToEdit && this.clearExistingFiles) {
-        formData.append("clearFiles", "true");
-      }
+      // File related FormData logic removed
 
       try {
         let response;
         if (this.itemIdToEdit) {
           response = await axios.put(
             `/api/homework/${this.itemIdToEdit}`,
-            formData,
-            {
-              headers: { "Content-Type": "multipart/form-data" },
-            }
+            homeworkData
           );
         } else {
-          response = await axios.post("/api/homework", formData, {
-            headers: { "Content-Type": "multipart/form-data" },
-          });
+          response = await axios.post("/api/homework", homeworkData);
         }
         this.successMessage =
           response.data.msg ||
@@ -615,10 +499,9 @@ export default {
             ? "Mājasdarbs veiksmīgi atjaunināts!"
             : "Mājasdarbs veiksmīgi pievienots!");
 
-        const previousCustomGroupId = this.homework.customGroupId; // Save before reset
+        const previousCustomGroupId = this.homework.customGroupId;
         if (!this.itemIdToEdit) {
           this.resetForm();
-          // Restore customGroupId if it's still valid
           if (
             this.availableCustomGroups.some(
               (g) => g._id === previousCustomGroupId
@@ -627,7 +510,6 @@ export default {
             this.homework.customGroupId = previousCustomGroupId;
           }
         }
-
         setTimeout(() => {
           this.$emit("itemActionSuccess", this.successMessage);
         }, 1500);
@@ -642,7 +524,6 @@ export default {
         if (this.errorMessage) {
           this.isLoading = false;
         }
-        // If success, isLoading will be handled by navigation/timeout
       }
     },
   },
@@ -687,79 +568,7 @@ export default {
   color: var(--secondary-color);
 }
 
-.file-input-styled {
-  /* Can add custom styling for file input if browser defaults are not desired */
-  /* For example, using ::file-selector-button pseudo-element */
-}
-
-.existing-files-display,
-.selected-files-display {
-  margin-top: 1rem;
-  padding: 0.75rem;
-  background-color: #f8f9fa; /* Light background for file list areas */
-  border: 1px solid var(--border-color);
-  border-radius: var(--border-radius);
-}
-.existing-files-display strong,
-.selected-files-display strong {
-  display: block;
-  margin-bottom: 0.5rem;
-  font-weight: 600;
-  color: var(--text-color);
-  font-size: 0.9rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-.existing-files-display strong .fas,
-.selected-files-display strong .fas {
-  color: var(--secondary-color);
-}
-
-.file-list {
-  list-style-type: none;
-  padding-left: 0;
-  margin-top: 0.5rem;
-}
-.file-list-item {
-  background-color: var(--card-bg-color);
-  border: 1px solid #e9ecef;
-  padding: 0.5rem 0.75rem;
-  border-radius: var(--border-radius);
-  margin-bottom: 0.3rem;
-  font-size: 0.9em;
-  color: #495057;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-.file-list-item .fas {
-  color: var(--primary-color);
-}
-.file-list-item.existing .fas {
-  color: var(--info-color);
-}
-.file-list-item.new .fas {
-  color: var(--success-color);
-}
-.file-size {
-  font-size: 0.85em;
-  color: #6c757d;
-  margin-left: auto; /* Pushes size to the right */
-}
-
-.clear-files-label {
-  display: flex;
-  align-items: center;
-  margin-top: 0.75rem;
-  font-size: 0.9em;
-  color: var(--text-color);
-}
-.clear-files-label input[type="checkbox"] {
-  margin-right: 0.5rem;
-  width: 15px;
-  height: 15px;
-}
+/* File input specific styles removed */
 
 .info-text {
   /* For small informative texts under inputs/selects */

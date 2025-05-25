@@ -164,24 +164,7 @@
             </ul>
           </div>
 
-          <div
-            v-if="item.fileAttachments && item.fileAttachments.length > 0"
-            class="item-files"
-          >
-            <strong><i class="fas fa-paperclip"></i> Pievienotie Faili:</strong>
-            <ul>
-              <li
-                v-for="(file, index) in item.fileAttachments"
-                :key="index"
-                class="file-entry"
-              >
-                <i class="fas fa-file"></i> {{ file.originalName }}
-                <span class="file-size"
-                  >({{ (file.size / 1024).toFixed(2) }} KB)</span
-                >
-              </li>
-            </ul>
-          </div>
+          <!-- File attachments display removed -->
 
           <div class="item-meta">
             <p class="item-author">
@@ -381,7 +364,6 @@
 
 <script>
 import axios from "axios";
-// import _ from 'lodash'; // Lodash is not used in this version due to v-model direct reactivity
 
 export default {
   name: "HomeworkListView",
@@ -404,7 +386,6 @@ export default {
       subjectFilter: "",
       groupFilter: "",
       sortBy: "date_desc",
-      // applyFiltersDebounced is removed as it's not strictly needed with v-model and computed properties
     };
   },
   computed: {
@@ -456,7 +437,7 @@ export default {
             case "added_desc":
               return createdB - createdA;
             default:
-              return dateB - dateA; // Default to date_desc
+              return dateB - dateA;
           }
         });
       return itemsToDisplay;
@@ -464,17 +445,11 @@ export default {
   },
   created() {
     this.fetchAllData();
-    // Debouncing for subjectFilter is handled by v-model's nature or can be added with a watcher if performance is an issue.
-    // For now, direct v-model updates are usually fine for client-side filtering.
   },
   methods: {
     toggleItemExpansion(itemId) {
       const itemIndex = this.allItems.findIndex((i) => i._id === itemId);
       if (itemIndex !== -1) {
-        // To ensure reactivity when modifying an array item's property,
-        // Vue 2 needed Vue.set or replacing the item. Vue 3 handles this better.
-        // Directly mutating should be fine if allItems is reactive.
-        // If issues, consider: this.allItems[itemIndex] = {...this.allItems[itemIndex], expanded: !this.allItems[itemIndex].expanded};
         this.allItems[itemIndex].expanded = !this.allItems[itemIndex].expanded;
       }
     },
@@ -542,7 +517,6 @@ export default {
         return dateString;
       }
     },
-    // applyFilters method is removed as computed property handles filtering reactively
     async toggleProgress(itemFromTemplate) {
       this.isUpdatingProgress = true;
       const newStatus = !itemFromTemplate.isDone;
@@ -599,12 +573,12 @@ export default {
             "itemDeleted",
             response.data.msg || "Ieraksts veiksmīgi dzēsts."
           );
-          alert(response.data.msg || "Ieraksts veiksmīgi dzēsts."); // Added alert for user feedback
+          alert(response.data.msg || "Ieraksts veiksmīgi dzēsts.");
         } catch (error) {
           console.error("Error deleting item:", error);
           this.errorMessage =
             error.response?.data?.msg || "Kļūda dzēšot ierakstu.";
-          alert(this.errorMessage); // Added alert for user feedback
+          alert(this.errorMessage);
         } finally {
           this.isDeleting = false;
         }
@@ -685,7 +659,6 @@ export default {
 </script>
 
 <style scoped>
-/* Styles are largely the same as the previous HomeworkListView response */
 .homework-list-view {
   padding: 1.5rem;
 }
@@ -755,7 +728,7 @@ export default {
 .list-item {
   margin-bottom: 1.5rem;
   transition: box-shadow 0.2s ease;
-  overflow: hidden; /* Important for collapsible content */
+  overflow: hidden;
 }
 .list-item:hover {
   box-shadow: var(--shadow-md);
@@ -832,7 +805,7 @@ export default {
   padding-bottom: 0;
 }
 .collapsible-content.expanded {
-  max-height: 1000px; /* Adjust if content can be very long */
+  max-height: 1000px;
   opacity: 1;
   padding-top: 0.75rem;
   padding-bottom: 0.75rem;
@@ -850,12 +823,10 @@ export default {
   color: var(--text-color);
 }
 
-.item-links,
-.item-files {
+.item-links {
   margin-top: 0.75rem;
 }
-.item-links strong,
-.item-files strong {
+.item-links strong {
   display: flex;
   align-items: center;
   gap: 0.4rem;
@@ -863,14 +834,12 @@ export default {
   color: var(--text-color);
   margin-bottom: 0.3rem;
 }
-.item-links ul,
-.item-files ul {
+.item-links ul {
   list-style-type: none;
-  padding-left: 1.5rem; /* Indent for visual hierarchy */
+  padding-left: 1.5rem;
   margin: 0;
 }
-.item-links li,
-.item-files li.file-entry {
+.item-links li {
   font-size: 0.9em;
   margin-bottom: 0.25rem;
   word-break: break-all;
@@ -885,14 +854,8 @@ export default {
 .item-links a:hover {
   text-decoration: underline;
 }
-.file-entry .fas {
-  color: var(--secondary-color);
-}
-.file-size {
-  font-size: 0.9em;
-  color: #6c757d;
-  margin-left: 0.5rem;
-}
+
+/* File related styles removed */
 
 .item-meta {
   margin-top: 1rem;
@@ -912,7 +875,7 @@ export default {
 }
 
 .list-item.item-done {
-  background-color: #e9f5e9; /* Light green background for done items */
+  background-color: #e9f5e9;
   border-left-color: var(--success-color);
 }
 .list-item.item-done .item-main-info .item-type-icon.homework {
@@ -962,11 +925,11 @@ export default {
 }
 .progress-checkbox-label input[type="checkbox"] {
   display: none;
-} /* Hide actual checkbox */
+}
 .progress-checkbox-label .fas,
 .progress-checkbox-label .far {
   margin-right: 0.5rem;
-  font-size: 1.2em; /* Make icon a bit larger */
+  font-size: 1.2em;
   color: var(--primary-color);
 }
 .list-item.item-done .progress-checkbox-label .fas,
@@ -975,7 +938,6 @@ export default {
 }
 
 .action-button-small {
-  /* Using global .action-button styles with smaller padding/font */
   padding: 0.4rem 0.8rem;
   font-size: 0.85em;
 }
@@ -1006,11 +968,10 @@ export default {
 
 .comments-area-wrapper {
   margin-top: 1rem;
-} /* Add some space before comments area */
+}
 .comments-area {
-  /* Uses .card-style-inner for nested card appearance */
   padding: 1rem;
-  margin-top: 0.5rem; /* Space from the actions footer */
+  margin-top: 0.5rem;
 }
 .comments-area h4 {
   font-size: 1.1rem;
@@ -1027,7 +988,7 @@ export default {
   text-align: center;
   padding: 1rem 0;
   display: flex;
-  flex-direction: column; /* Stack icon and text */
+  flex-direction: column;
   align-items: center;
   gap: 0.5rem;
 }
@@ -1050,8 +1011,8 @@ export default {
 }
 .comment-text {
   margin: 0 0 0.5rem 0;
-  white-space: pre-wrap; /* Preserve whitespace and newlines */
-  word-wrap: break-word; /* Break long words */
+  white-space: pre-wrap;
+  word-wrap: break-word;
   font-size: 0.95rem;
   color: var(--text-color);
 }
@@ -1059,10 +1020,10 @@ export default {
   font-size: 0.8rem;
   color: #6c757d;
   display: flex;
-  justify-content: space-between; /* Pushes delete button to the right if it's part of this flex */
+  justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
-  gap: 0.5rem; /* Space between name, date, and delete button */
+  gap: 0.5rem;
 }
 .comment-meta span {
   display: flex;
@@ -1073,17 +1034,17 @@ export default {
   background: none;
   border: none;
   color: var(--danger-color);
-  font-size: 1em; /* Relative to parent (.comment-meta) */
+  font-size: 1em;
   cursor: pointer;
   padding: 0.25rem;
-  line-height: 1; /* Important for icon-only buttons */
+  line-height: 1;
 }
 .delete-comment-btn:hover {
-  color: #c82333; /* Darker red */
+  color: #c82333;
 }
 .delete-comment-btn .fas {
   font-size: 1.1em;
-} /* Control icon size */
+}
 
 .add-comment-form {
   margin-top: 1rem;
@@ -1092,14 +1053,12 @@ export default {
   gap: 0.5rem;
 }
 .add-comment-form textarea {
-  min-height: 70px; /* Decent starting height */
+  min-height: 70px;
   font-size: 0.95em;
-  /* Inherits global styles for textarea */
 }
 .add-comment-form .action-button {
-  /* For the "Pievienot Komentāru" button */
-  align-self: flex-end; /* Button to the right */
-  padding: 0.5rem 1rem; /* Adjust padding as needed */
+  align-self: flex-end;
+  padding: 0.5rem 1rem;
 }
 
 .loading-indicator.small {
@@ -1114,16 +1073,16 @@ export default {
 
 @media (max-width: 768px) {
   .filters-grid {
-    grid-template-columns: 1fr; /* Stack filters on smaller screens */
+    grid-template-columns: 1fr;
   }
   .item-actions-footer {
     flex-direction: column;
-    align-items: flex-start; /* Align all action groups to the start */
+    align-items: flex-start;
   }
   .contextual-actions {
     margin-top: 0.5rem;
     width: 100%;
-    justify-content: space-between; /* Spread out comments and edit/delete */
+    justify-content: space-between;
   }
 }
 </style>
