@@ -5,6 +5,26 @@ const authMiddleware = require('../middleware/authMiddleware');
 const adminMiddleware = require('../middleware/adminMiddleware');
 const { ObjectId } = require('mongodb');
 
+// Helper function to create notifications
+async function createNotification(db, recipientUserId, type, message, link, relatedItemId, relatedItemType) {
+    try {
+        const notificationsCollection = db.collection('notifications');
+        await notificationsCollection.insertOne({
+            userId: recipientUserId,
+            type: type,
+            message: message,
+            link: link || null,
+            isRead: false,
+            createdAt: new Date(),
+            relatedItemId: relatedItemId ? new ObjectId(relatedItemId) : null,
+            relatedItemType: relatedItemType || null,
+        });
+    } catch (error) {
+        console.error(`Error creating notification for user ${recipientUserId}:`, error);
+    }
+}
+
+
 // @route   POST api/groups
 // @desc    Create a new group (Admin only)
 // @access  Private (Admin)
@@ -39,7 +59,7 @@ router.post('/', [authMiddleware, adminMiddleware], async (req, res) => {
             adminCreatorId: new ObjectId(req.user.id),
             createdAt: new Date(),
             updatedAt: new Date(),
-            members: [], // Initialize as empty array of user ObjectIds
+            members: [],
         };
 
         const result = await groupsCollection.insertOne(newGroup);
@@ -99,7 +119,6 @@ router.put('/:groupId', [authMiddleware, adminMiddleware], async (req, res) => {
         return res.status(400).json({ msg: 'Nederīgs grupas ID.' });
     }
 
-    // Validation for updated fields
     if (!name || name.trim() === '') {
         return res.status(400).json({ msg: 'Grupas nosaukums ir obligāts lauks.' });
     }
@@ -171,11 +190,20 @@ router.delete('/:groupId', [authMiddleware, adminMiddleware], async (req, res) =
         const groupsCollection = db.collection('groups');
         const groupApplicationsCollection = db.collection('groupApplications');
         const usersCollection = db.collection('users');
+        const notificationsCollection = db.collection('notifications');
         const groupObjectId = new ObjectId(groupId);
 
         const groupToDelete = await groupsCollection.findOne({ _id: groupObjectId });
         if (!groupToDelete) {
             return res.status(404).json({ msg: 'Grupa nav atrasta.' });
+        }
+
+        // Notify members before removing them
+        if (groupToDelete.members && groupToDelete.members.length > 0) {
+            const message = `Jūs tikāt noņemts no grupas '${groupToDelete.name}', jo grupa tika dzēsta.`;
+            for (const memberId of groupToDelete.members) {
+                await createNotification(db, memberId, 'GROUP_DELETED_MEMBER', message, '/dashboard', groupObjectId, 'group');
+            }
         }
 
         await groupsCollection.deleteOne({ _id: groupObjectId });
@@ -184,6 +212,9 @@ router.delete('/:groupId', [authMiddleware, adminMiddleware], async (req, res) =
             { enrolledCustomGroups: groupObjectId },
             { $pull: { enrolledCustomGroups: groupObjectId } }
         );
+        // Delete notifications related to this group being approved/rejected/added to
+        await notificationsCollection.deleteMany({ relatedItemId: groupObjectId, relatedItemType: 'group' });
+
 
         res.json({ msg: 'Grupa un saistītie pieteikumi veiksmīgi dzēsti. Grupa noņemta no lietotāju profiliem.' });
 
@@ -302,7 +333,7 @@ router.get('/applications/my', authMiddleware, async (req, res) => {
 // @desc    Get all group applications (for Admin, can filter by status)
 // @access  Private (Admin)
 router.get('/applications', [authMiddleware, adminMiddleware], async (req, res) => {
-    const { status, groupId } = req.query;
+    const { status, groupId } = req.query; // groupId for filtering applications for a specific group
     try {
         const db = getDB();
         const groupApplicationsCollection = db.collection('groupApplications');
@@ -321,7 +352,7 @@ router.get('/applications', [authMiddleware, adminMiddleware], async (req, res) 
             {
                 $project: {
                     _id: 1, groupId: 1,
-                    groupName: { $ifNull: ['$groupDetails.name', '$groupName'] },
+                    groupName: { $ifNull: ['$groupDetails.name', '$groupName'] }, // Use stored groupName if details not found
                     userId: 1, userFirstName: 1, userEmail: 1, message: 1,
                     status: 1, appliedAt: 1
                 }
@@ -358,12 +389,14 @@ router.put('/applications/:applicationId/approve', [authMiddleware, adminMiddlew
             return res.status(400).json({ msg: `Pieteikums jau ir ticis '${application.status}'.` });
         }
 
-        const groupExists = await groupsCollection.findOne({ _id: application.groupId });
-        if (!groupExists) {
+        const groupToJoin = await groupsCollection.findOne({ _id: application.groupId });
+        if (!groupToJoin) {
             await groupApplicationsCollection.updateOne(
                 { _id: appObjectId },
                 { $set: { status: 'rejected', processedAt: new Date(), processedBy: new ObjectId(req.user.id), reason: 'Grupa vairs neeksistē' } }
             );
+            // Notify user
+            await createNotification(db, application.userId, 'GROUP_APPLICATION_REJECTED', `Jūsu pieteikums grupai '${application.groupName || 'Nezināma grupa'}' tika noraidīts, jo grupa vairs neeksistē.`, '/grupas', application.groupId, 'group');
             return res.status(404).json({ msg: 'Nevar apstiprināt pieteikumu: Grupa vairs neeksistē. Pieteikums automātiski noraidīts.' });
         }
 
@@ -379,6 +412,11 @@ router.put('/applications/:applicationId/approve', [authMiddleware, adminMiddlew
             { _id: application.userId },
             { $addToSet: { enrolledCustomGroups: application.groupId } }
         );
+
+        // Notify user of approval
+        const message = `Jūsu pieteikums grupai '${groupToJoin.name}' ir apstiprināts.`;
+        await createNotification(db, application.userId, 'GROUP_APPLICATION_APPROVED', message, `/grupas`, application.groupId, 'group'); // Link to groups list for now
+
         res.json({ msg: 'Pieteikums veiksmīgi apstiprināts. Lietotājs pievienots grupai.' });
     } catch (err) {
         console.error('Error approving group application:', err);
@@ -410,6 +448,11 @@ router.put('/applications/:applicationId/reject', [authMiddleware, adminMiddlewa
             { _id: appObjectId },
             { $set: { status: 'rejected', processedAt: new Date(), processedBy: new ObjectId(req.user.id) } }
         );
+
+        // Notify user of rejection
+        const message = `Jūsu pieteikums grupai '${application.groupName || 'Nezināma Grupa'}' tika noraidīts.`;
+        await createNotification(db, application.userId, 'GROUP_APPLICATION_REJECTED', message, `/grupas`, application.groupId, 'group');
+
         res.json({ msg: 'Pieteikums veiksmīgi noraidīts.' });
     } catch (err) {
         console.error('Error rejecting group application:', err);
@@ -417,14 +460,15 @@ router.put('/applications/:applicationId/reject', [authMiddleware, adminMiddlewa
     }
 });
 
-// ==== NEW ROUTES FOR DIRECT MEMBER MANAGEMENT ====
+
+// ==== ROUTES FOR DIRECT MEMBER MANAGEMENT ====
 
 // @route   POST api/groups/:groupId/members
 // @desc    Admin directly adds a user to a group
 // @access  Private (Admin)
 router.post('/:groupId/members', [authMiddleware, adminMiddleware], async (req, res) => {
     const { groupId } = req.params;
-    const { userId } = req.body; // User ID to add
+    const { userId } = req.body;
 
     if (!ObjectId.isValid(groupId) || !ObjectId.isValid(userId)) {
         return res.status(400).json({ msg: 'Nederīgs grupas vai lietotāja ID.' });
@@ -447,29 +491,27 @@ router.post('/:groupId/members', [authMiddleware, adminMiddleware], async (req, 
         if (!user) {
             return res.status(404).json({ msg: 'Lietotājs nav atrasts.' });
         }
-        // Optional: Check if user is already a member (though $addToSet handles duplicates)
-        // if (group.members && group.members.some(memberId => memberId.equals(userObjectId))) {
-        //     return res.status(400).json({ msg: 'Lietotājs jau ir šīs grupas dalībnieks.' });
-        // }
 
-        // Add user to group's members list
         const groupUpdateResult = await groupsCollection.updateOne(
             { _id: groupObjectId },
             { $addToSet: { members: userObjectId } }
         );
 
-        // Add group to user's enrolledCustomGroups list
         const userUpdateResult = await usersCollection.updateOne(
             { _id: userObjectId },
             { $addToSet: { enrolledCustomGroups: groupObjectId } }
         );
 
         if (groupUpdateResult.modifiedCount > 0 || userUpdateResult.modifiedCount > 0) {
-            // Also mark any 'pending' application for this user to this group as 'approved'
             await db.collection('groupApplications').updateOne(
                 { userId: userObjectId, groupId: groupObjectId, status: 'pending' },
                 { $set: { status: 'approved', processedAt: new Date(), processedBy: new ObjectId(req.user.id), reason: 'Manuāli pievienots administrators' } }
             );
+
+            // Notify user
+            const message = `Jūs tikāt pievienots grupai '${group.name}' no administratora puses.`;
+            await createNotification(db, userObjectId, 'ADMIN_ADDED_TO_GROUP', message, `/grupas`, groupObjectId, 'group');
+
             res.json({ msg: `Lietotājs ${user.firstName} ${user.lastName} veiksmīgi pievienots grupai '${group.name}'.` });
         } else {
             res.json({ msg: `Lietotājs ${user.firstName} ${user.lastName} jau bija grupā '${group.name}' vai izmaiņas netika veiktas.` });
@@ -508,24 +550,21 @@ router.delete('/:groupId/members/:userId', [authMiddleware, adminMiddleware], as
             return res.status(404).json({ msg: 'Lietotājs nav atrasts.' });
         }
 
-        // Remove user from group's members list
         const groupUpdateResult = await groupsCollection.updateOne(
             { _id: groupObjectId },
             { $pull: { members: userObjectId } }
         );
 
-        // Remove group from user's enrolledCustomGroups list
         const userUpdateResult = await usersCollection.updateOne(
             { _id: userObjectId },
             { $pull: { enrolledCustomGroups: groupObjectId } }
         );
 
-        // If user is removed, their 'approved' application could be marked as 'revoked' or 'rejected'.
-        // For now, we'll keep it simple: their application status won't change automatically.
-        // They would need to re-apply if they wanted to join again through the application system.
-        // Or, an admin could change their application status manually if a UI for that existed.
-
         if (groupUpdateResult.modifiedCount > 0 || userUpdateResult.modifiedCount > 0) {
+            // Notify user
+            const message = `Jūs tikāt noņemts no grupas '${group.name}' no administratora puses.`;
+            await createNotification(db, userObjectId, 'ADMIN_REMOVED_FROM_GROUP', message, `/grupas`, groupObjectId, 'group');
+
             res.json({ msg: `Lietotājs ${user.firstName} ${user.lastName} veiksmīgi noņemts no grupas '${group.name}'.` });
         } else {
             res.json({ msg: `Lietotājs ${user.firstName} ${user.lastName} nebija grupā '${group.name}' vai izmaiņas netika veiktas.` });

@@ -10,7 +10,8 @@ const testRoutes = require('./routes/testRoutes');
 const progressRoutes = require('./routes/progressRoutes');
 const commentRoutes = require('./routes/commentRoutes');
 const groupRoutes = require('./routes/groupRoutes');
-const userRoutes = require('./routes/userRoutes'); // Added
+const userRoutes = require('./routes/userRoutes');
+const notificationRoutes = require('./routes/notificationRoutes'); // Added
 
 const app = express();
 
@@ -30,7 +31,8 @@ app.use('/api/tests', testRoutes);
 app.use('/api/progress', progressRoutes);
 app.use('/api/comments', commentRoutes);
 app.use('/api/groups', groupRoutes);
-app.use('/api/users', userRoutes); // Added
+app.use('/api/users', userRoutes);
+app.use('/api/notifications', notificationRoutes); // Added
 
 
 const PORT = process.env.PORT || 5000;

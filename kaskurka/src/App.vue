@@ -13,6 +13,27 @@
           <h1>KasKurKa</h1>
         </div>
         <div class="header-user-info">
+          <!-- Notification Bell -->
+          <div
+            v-if="currentUser"
+            class="notification-bell-container"
+            @click.stop="toggleNotificationsDropdown"
+          >
+            <i class="fas fa-bell notification-icon"></i>
+            <span v-if="unreadNotificationCount > 0" class="notification-badge">
+              {{ unreadNotificationCount > 9 ? "9+" : unreadNotificationCount }}
+            </span>
+            <NotificationDropdown
+              v-if="showNotificationsDropdown"
+              :notifications="recentNotifications"
+              :unread-count="unreadNotificationCount"
+              @mark-as-read="markNotificationAsRead"
+              @mark-all-as-read="markAllNotificationsAsRead"
+              @view-all-notifications="navigateToNotificationList"
+              @close-dropdown="closeNotificationsDropdown"
+            />
+          </div>
+
           <router-link
             v-if="currentUser && !isMyProfileView(currentView)"
             to="#"
@@ -55,7 +76,7 @@
             <span
               v-if="
                 currentUser.role === 'student' &&
-                !isAdminViewingAsStudent && // Don't show student groups if admin is viewing as student with admin's actual data
+                !isAdminViewingAsStudent &&
                 currentUser.enrolledCustomGroupsDetails &&
                 currentUser.enrolledCustomGroupsDetails.length > 0
               "
@@ -259,6 +280,12 @@
         @userUpdateSuccess="handleUserUpdateSuccess"
         @cancelEditUser="navigateToManageUsers"
       />
+      <NotificationListView
+        v-else-if="currentView === 'notificationList' && currentUser"
+        :current-user="currentUser"
+        @navigateToDashboard="navigateToUserSpecificDashboard"
+        @notifications-updated="fetchUserNotifications"
+      />
 
       <div v-else-if="isLoadingAuth" class="loading-indicator">
         <i class="fas fa-spinner fa-spin"></i> Notiek ielāde...
@@ -277,7 +304,6 @@
 </template>
 
 <script>
-// Import statements as before
 import RegisterView from "./views/RegisterView.vue";
 import LoginView from "./views/LoginView.vue";
 import DashboardView from "./views/DashboardView.vue";
@@ -293,6 +319,9 @@ import EditGroupView from "./views/EditGroupView.vue";
 import ManageUsersView from "./views/ManageUsersView.vue";
 import EditUserView from "./views/EditUserView.vue";
 import MyProfileView from "./views/MyProfileView.vue";
+import NotificationDropdown from "./components/NotificationDropdown.vue"; // New component
+import NotificationListView from "./views/NotificationListView.vue"; // New view
+
 import axios from "axios";
 
 export default {
@@ -313,13 +342,15 @@ export default {
     ManageUsersView,
     EditUserView,
     MyProfileView,
+    NotificationDropdown, // Register new component
+    NotificationListView, // Register new view
   },
   data() {
     return {
       currentView: "home",
       currentUser: null,
       isLoadingAuth: true,
-      isAdminViewingAsStudent: false, // New flag
+      isAdminViewingAsStudent: false,
       dashboardRelatedViews: [
         "dashboard",
         "addHomework",
@@ -334,6 +365,7 @@ export default {
         "manageUsers",
         "editUser",
         "myProfile",
+        "notificationList", // Add notification list view
       ],
       adminSpecificViews: [
         "adminDashboard",
@@ -348,17 +380,113 @@ export default {
       editingItemType: null,
       editingGroupId: null,
       editingUserId: null,
+
+      // Notification related data
+      recentNotifications: [],
+      unreadNotificationCount: 0,
+      showNotificationsDropdown: false,
+      notificationInterval: null,
     };
   },
   provide() {
     return {
       refreshUser: this.refreshCurrentUserState,
+      fetchUserNotifications: this.fetchUserNotifications, // Provide this for child components
     };
   },
   created() {
     this.tryAutoLogin();
+    document.addEventListener("click", this.handleClickOutsideDropdown);
+  },
+  beforeUnmount() {
+    if (this.notificationInterval) {
+      clearInterval(this.notificationInterval);
+    }
+    document.removeEventListener("click", this.handleClickOutsideDropdown);
   },
   methods: {
+    async fetchUserNotifications() {
+      if (!this.currentUser) return;
+      try {
+        const response = await axios.get("/api/notifications");
+        this.recentNotifications = response.data.notifications;
+        this.unreadNotificationCount = response.data.unreadCount;
+      } catch (error) {
+        console.error("Error fetching notifications:", error);
+        // Optionally show a non-intrusive error to the user
+      }
+    },
+    startNotificationPolling() {
+      if (this.notificationInterval) {
+        clearInterval(this.notificationInterval);
+      }
+      if (this.currentUser) {
+        this.fetchUserNotifications(); // Initial fetch
+        this.notificationInterval = setInterval(
+          this.fetchUserNotifications,
+          60000
+        ); // Poll every 60 seconds
+      }
+    },
+    stopNotificationPolling() {
+      if (this.notificationInterval) {
+        clearInterval(this.notificationInterval);
+        this.notificationInterval = null;
+      }
+      this.recentNotifications = [];
+      this.unreadNotificationCount = 0;
+    },
+    toggleNotificationsDropdown() {
+      this.showNotificationsDropdown = !this.showNotificationsDropdown;
+      if (
+        this.showNotificationsDropdown &&
+        this.recentNotifications.length === 0 &&
+        this.unreadNotificationCount > 0
+      ) {
+        // If dropdown opens and recent list is empty but there are unread, fetch.
+        this.fetchUserNotifications();
+      }
+    },
+    closeNotificationsDropdown() {
+      this.showNotificationsDropdown = false;
+    },
+    handleClickOutsideDropdown(event) {
+      const dropdownContainer = this.$el.querySelector(
+        ".notification-bell-container"
+      );
+      if (
+        this.showNotificationsDropdown &&
+        dropdownContainer &&
+        !dropdownContainer.contains(event.target)
+      ) {
+        this.closeNotificationsDropdown();
+      }
+    },
+    async markNotificationAsRead(notificationId) {
+      try {
+        await axios.put(`/api/notifications/${notificationId}/read`);
+        this.fetchUserNotifications(); // Re-fetch to update list and count
+      } catch (error) {
+        console.error("Error marking notification as read:", error);
+        alert("Kļūda, atzīmējot paziņojumu kā izlasītu.");
+      }
+    },
+    async markAllNotificationsAsRead() {
+      try {
+        await axios.put(`/api/notifications/read-all`);
+        this.fetchUserNotifications(); // Re-fetch
+        this.closeNotificationsDropdown();
+      } catch (error) {
+        console.error("Error marking all notifications as read:", error);
+        alert("Kļūda, atzīmējot visus paziņojumus kā izlasītus.");
+      }
+    },
+    navigateToNotificationList() {
+      this.currentView = "notificationList";
+      this.closeNotificationsDropdown();
+      this.clearAllEditStates();
+    },
+
     async refreshCurrentUserState() {
       console.log("[App.vue] Attempting to refresh current user state...");
       if (!this.currentUser || !localStorage.getItem("token")) {
@@ -368,27 +496,20 @@ export default {
       try {
         const response = await axios.get("/api/auth/me/refresh");
         const refreshedUser = response.data;
-
-        // If admin was viewing as student, ensure this state is not lost upon refresh,
-        // unless the refresh itself implies a full session reset.
-        // For now, we assume a refresh might reset the isAdminViewingAsStudent state implicitly
-        // if the backend doesn't support maintaining this state.
-        // However, if the refresh is client-initiated to update details, keep the view mode.
-        // If `this.currentUser.id` changes, then it's a different user, reset.
         if (this.currentUser.id !== refreshedUser.id) {
           this.isAdminViewingAsStudent = false;
         }
-
         this.currentUser = refreshedUser;
         localStorage.setItem("user", JSON.stringify(this.currentUser));
         console.log("[App.vue] User state refreshed:", this.currentUser);
+        this.startNotificationPolling(); // Refresh notifications too
       } catch (error) {
         console.error("[App.vue] Error refreshing user state:", error);
         if (
           error.response &&
           (error.response.status === 401 || error.response.status === 403)
         ) {
-          this.handleLogout(); // This will also reset isAdminViewingAsStudent
+          this.handleLogout();
           throw new Error("User refresh failed, logged out.");
         }
         throw error;
@@ -413,17 +534,13 @@ export default {
           const user = JSON.parse(userString);
           this.currentUser = user;
           axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-
-          // Do not automatically reset isAdminViewingAsStudent here,
-          // as the user might have refreshed the page while in that mode.
-          // Let navigation methods handle it or a dedicated "stop viewing" action.
+          this.startNotificationPolling(); // Start polling for notifications
 
           if (
             this.currentView === "home" ||
             this.currentView === "login" ||
             this.currentView === "register"
           ) {
-            // If already viewing as student from previous session and currentView is dashboard, stay
             if (
               this.isAdminViewingAsStudent &&
               this.currentView === "dashboard"
@@ -435,16 +552,16 @@ export default {
             ) {
               this.currentView = "adminDashboard";
             } else if (this.currentUser.role === "student") {
-              // if not admin, or admin not viewing as student
               this.currentView = "dashboard";
             }
           }
         } catch (e) {
           console.error("Auto-login error, clearing stored data:", e);
-          this.handleLogout();
+          this.handleLogout(); // This will also stop polling
         }
       } else {
-        this.isAdminViewingAsStudent = false; // No token, no special view mode
+        this.isAdminViewingAsStudent = false;
+        this.stopNotificationPolling();
         if (
           this.dashboardRelatedViews.includes(this.currentView) ||
           this.adminSpecificViews.includes(this.currentView) ||
@@ -461,20 +578,23 @@ export default {
       this.currentView = "login";
       this.isAdminViewingAsStudent = false;
       this.clearAllEditStates();
+      this.stopNotificationPolling();
     },
     navigateToRegister() {
       this.currentView = "register";
       this.isAdminViewingAsStudent = false;
       this.clearAllEditStates();
+      this.stopNotificationPolling();
     },
     showHome() {
       this.currentView = "home";
       this.isAdminViewingAsStudent = false;
       this.clearAllEditStates();
+      // If user is logged in, polling should continue, otherwise it should be stopped (handled by tryAutoLogin/logout)
     },
     navigateToMyProfile() {
       if (this.currentUser) {
-        this.isAdminViewingAsStudent = false; // Exit "view as student" when going to own profile
+        this.isAdminViewingAsStudent = false;
         this.currentView = "myProfile";
       } else {
         this.navigateToLogin();
@@ -489,7 +609,6 @@ export default {
         ) {
           this.currentView = "adminDashboard";
         } else {
-          // Student, or Admin viewing as student
           this.currentView = "dashboard";
         }
       } else {
@@ -498,24 +617,21 @@ export default {
       this.clearAllEditStates();
     },
     navigateToStudentDashboard() {
-      // Called when admin clicks "Skatīt kā students"
       if (this.currentUser && this.currentUser.role === "admin") {
         this.isAdminViewingAsStudent = true;
         this.currentView = "dashboard";
       } else if (this.currentUser && this.currentUser.role === "student") {
-        this.currentView = "dashboard"; // Normal student navigation
+        this.currentView = "dashboard";
       } else {
         this.navigateToLogin();
       }
       this.clearAllEditStates();
     },
     returnToAdminView() {
-      // New method for admin to return from student view
       if (this.currentUser && this.currentUser.role === "admin") {
         this.isAdminViewingAsStudent = false;
         this.currentView = "adminDashboard";
       } else {
-        // Should not happen if logic is correct, but handle gracefully
         this.showHome();
       }
       this.clearAllEditStates();
@@ -533,7 +649,8 @@ export default {
       axios.defaults.headers.common[
         "Authorization"
       ] = `Bearer ${authData.token}`;
-      this.isAdminViewingAsStudent = false; // Reset on new login
+      this.isAdminViewingAsStudent = false;
+      this.startNotificationPolling();
       this.navigateToUserSpecificDashboard();
     },
     handleLogout() {
@@ -541,7 +658,8 @@ export default {
       localStorage.removeItem("token");
       localStorage.removeItem("user");
       delete axios.defaults.headers.common["Authorization"];
-      this.isAdminViewingAsStudent = false; // Reset this flag
+      this.isAdminViewingAsStudent = false;
+      this.stopNotificationPolling();
       this.currentView = "home";
       alert("Jūs esat veiksmīgi izgājis no sistēmas.");
       this.clearAllEditStates();
@@ -574,23 +692,21 @@ export default {
     },
     handleItemActionSuccess(message) {
       alert(message || "Darbība veiksmīga!");
+      this.fetchUserNotifications(); // Update notifications if item action could generate one
       this.clearAllEditStates();
-      // If admin was viewing as student and added/edited an item, they might want to stay in student list view.
-      // Or return to the appropriate dashboard. For now, HomeworkList seems fine.
       this.navigateToHomeworkList();
     },
     navigateToHomeworkList() {
       if (this.currentUser) {
         this.currentView = "homeworkList";
-        // Do not clear isAdminViewingAsStudent here, let them stay in that "mode"
-        // unless they explicitly navigate back to admin panel or profile.
-        this.clearAllEditStates(); // Clear item edit states
+        this.clearAllEditStates();
       } else {
         this.navigateToLogin();
       }
     },
     handleItemDeletedInList(message) {
       alert(message || "Ieraksts dzēsts.");
+      this.fetchUserNotifications(); // Update notifications if item deletion impacts them
     },
     navigateToGroupList() {
       if (this.currentUser) {
@@ -602,16 +718,16 @@ export default {
     },
     navigateToAdminDashboard() {
       if (this.currentUser && this.currentUser.role === "admin") {
-        this.isAdminViewingAsStudent = false; // Explicitly exit "view as student" mode
+        this.isAdminViewingAsStudent = false;
         this.currentView = "adminDashboard";
       } else {
-        this.showHome(); // If not admin, or no user, go home
+        this.showHome();
       }
       this.clearAllEditStates();
     },
     navigateToCreateGroup() {
       if (this.currentUser && this.currentUser.role === "admin") {
-        this.isAdminViewingAsStudent = false; // Should be in admin mode for this
+        this.isAdminViewingAsStudent = false;
         this.currentView = "createGroup";
       } else {
         this.navigateToLogin();
@@ -620,7 +736,7 @@ export default {
     },
     handleGroupCreated(message) {
       alert(message || "Grupa veiksmīgi izveidota!");
-      this.navigateToAdminDashboard(); // This will reset isAdminViewingAsStudent
+      this.navigateToAdminDashboard();
     },
     navigateToManageGroupApplications() {
       if (this.currentUser && this.currentUser.role === "admin") {
@@ -652,7 +768,7 @@ export default {
     },
     handleGroupUpdateSuccess(message) {
       alert(message || "Grupa veiksmīgi atjaunināta!");
-      this.navigateToManageGroups(); // This will reset isAdminViewingAsStudent
+      this.navigateToManageGroups();
     },
     navigateToManageUsers() {
       if (this.currentUser && this.currentUser.role === "admin") {
@@ -675,7 +791,7 @@ export default {
     },
     handleUserUpdateSuccess(message) {
       alert(message || "Lietotāja dati veiksmīgi atjaunināti!");
-      this.navigateToManageUsers(); // This will reset isAdminViewingAsStudent
+      this.navigateToManageUsers();
     },
     clearAllEditStates() {
       this.editingItemId = null;
@@ -688,7 +804,7 @@ export default {
 </script>
 
 <style>
-/* Global Styles */
+/* Global Styles (existing styles) */
 :root {
   --primary-color: #007bff; /* Vibrant Blue */
   --secondary-color: #6c757d; /* Grey */
@@ -739,13 +855,12 @@ body {
   min-height: 100vh;
 }
 
-/* Header Styles */
 .app-header {
   background-color: var(--header-bg-color);
   color: var(--text-color-light);
   padding: 1rem 1.5rem;
   box-shadow: var(--shadow-md);
-  z-index: 1000; /* Keep header on top */
+  z-index: 1000;
 }
 .app-header .header-content {
   display: flex;
@@ -766,18 +881,18 @@ body {
 }
 .app-header h1 {
   margin: 0;
-  font-size: 1.75rem; /* Adjusted size */
+  font-size: 1.75rem;
   font-weight: 700;
   letter-spacing: -0.5px;
 }
 .app-header .header-user-info {
   display: flex;
   align-items: center;
-  gap: 1rem; /* Consistent gap */
+  gap: 1rem;
   flex-wrap: wrap;
 }
 .app-header .header-link {
-  color: #e0e0e0; /* Lighter for better contrast on dark header */
+  color: #e0e0e0;
   text-decoration: none;
   font-weight: 500;
   padding: 0.5rem 0.75rem;
@@ -805,18 +920,14 @@ body {
   color: #fff;
   background-color: var(--info-color);
 }
-
 .app-header .return-to-admin-link {
-  /* Style for the "Return to Admin Panel" button */
-  background-color: var(--warning-color); /* Or another distinct color */
-  color: var(--text-color); /* Dark text for yellow bg */
-  /* Inherits .action-button styles if that class is also applied */
-}
-.app-header .return-to-admin-link:hover {
-  background-color: #e0a800; /* Darker warning */
+  background-color: var(--warning-color);
   color: var(--text-color);
 }
-
+.app-header .return-to-admin-link:hover {
+  background-color: #e0a800;
+  color: var(--text-color);
+}
 .app-header .user-greeting {
   font-size: 0.95rem;
   display: flex;
@@ -830,8 +941,45 @@ body {
 }
 .app-header .user-greeting .viewing-as-student-indicator {
   font-weight: bold;
-  color: var(--warning-color); /* Make it stand out */
+  color: var(--warning-color);
   opacity: 1;
+}
+
+/* Notification Bell Styles */
+.notification-bell-container {
+  position: relative;
+  cursor: pointer;
+  padding: 0.5rem 0.75rem; /* Similar to header-link for alignment */
+  border-radius: var(--border-radius);
+  transition: background-color 0.2s ease;
+}
+.notification-bell-container:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+.notification-icon {
+  font-size: 1.25rem; /* Adjust size as needed */
+  color: #e0e0e0; /* Match header link color */
+}
+.notification-bell-container:hover .notification-icon {
+  color: var(--text-color-light);
+}
+.notification-badge {
+  position: absolute;
+  top: 2px; /* Adjust position */
+  right: 2px; /* Adjust position */
+  background-color: var(--danger-color);
+  color: white;
+  border-radius: 50%;
+  padding: 0.15em 0.45em; /* Adjust padding for size */
+  font-size: 0.7rem; /* Smaller font for badge */
+  font-weight: bold;
+  min-width: 18px; /* Ensure circle for single digit */
+  height: 18px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  line-height: 1;
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
 }
 
 /* Main Content Styles */
@@ -840,7 +988,7 @@ body {
   padding: 1.5rem;
   margin: 0 auto;
   width: 100%;
-  max-width: 1200px; /* Consistent max width */
+  max-width: 1200px;
   box-sizing: border-box;
 }
 .home-container {
@@ -849,7 +997,6 @@ body {
   margin: 0 auto;
 }
 .card-style {
-  /* General card styling for intro section, etc. */
   background-color: var(--card-bg-color);
   border-radius: var(--border-radius);
   box-shadow: var(--shadow-sm);
@@ -857,12 +1004,11 @@ body {
   margin-bottom: 1.5rem;
 }
 .intro-section {
-  /* Inherits from card-style */
   text-align: left;
 }
 .intro-section .intro-title {
   font-size: 1.75rem;
-  color: var(--header-bg-color); /* Use a darker color for titles */
+  color: var(--header-bg-color);
   margin-bottom: 1rem;
   text-align: center;
 }
@@ -872,7 +1018,6 @@ body {
   line-height: 1.7;
   margin-bottom: 1rem;
 }
-
 .actions-nav {
   display: flex;
   justify-content: center;
@@ -908,14 +1053,14 @@ body {
   color: var(--text-color-light);
 }
 .action-button.primary-button:hover:not([disabled]) {
-  background-color: #0069d9; /* Darker primary */
+  background-color: #0069d9;
 }
 .action-button.secondary-button {
   background-color: var(--secondary-color);
   color: var(--text-color-light);
 }
 .action-button.secondary-button:hover:not([disabled]) {
-  background-color: #5a6268; /* Darker secondary */
+  background-color: #5a6268;
 }
 .action-button[disabled] {
   background-color: #e9ecef;
@@ -926,9 +1071,9 @@ body {
 
 /* Form Styles */
 .form-view {
-  max-width: 650px; /* Slightly wider forms */
-  margin: 1rem auto; /* Consistent margin */
-  padding: 2rem; /* More padding */
+  max-width: 650px;
+  margin: 1rem auto;
+  padding: 2rem;
   background-color: var(--card-bg-color);
   border-radius: var(--border-radius);
   box-shadow: var(--shadow-md);
@@ -938,20 +1083,20 @@ body {
 }
 .form-view h2 {
   text-align: center;
-  color: var(--header-bg-color); /* Darker for titles */
+  color: var(--header-bg-color);
   margin-top: 0;
-  margin-bottom: 1.5rem; /* More space */
+  margin-bottom: 1.5rem;
   font-size: 1.75rem;
   font-weight: 600;
 }
 .form-group {
-  margin-bottom: 1.25rem; /* Consistent spacing */
+  margin-bottom: 1.25rem;
 }
 .form-group label {
   display: block;
   margin-bottom: 0.5rem;
   font-weight: 600;
-  color: var(--text-color); /* Darker label color */
+  color: var(--text-color);
   font-size: 0.95rem;
 }
 .form-group input[type="text"],
@@ -962,17 +1107,17 @@ body {
 .form-group input[type="time"],
 .form-group textarea,
 .form-group select {
-  width: 100%; /* Full width with box-sizing */
+  width: 100%;
   padding: 0.75rem;
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius);
   font-size: 1rem;
   box-sizing: border-box;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
-  background-color: #fff; /* Ensure inputs have a background */
+  background-color: #fff;
 }
 .form-group input[type="file"] {
-  padding: 0.5rem; /* Adjusted padding for file input */
+  padding: 0.5rem;
 }
 .form-group textarea {
   min-height: 120px;
@@ -989,7 +1134,7 @@ body {
   display: block;
   margin-top: 0.3rem;
   font-size: 0.85rem;
-  color: #6c757d; /* Lighter grey for help text */
+  color: #6c757d;
 }
 .required-field {
   color: var(--danger-color);
@@ -1006,14 +1151,14 @@ body {
   font-weight: 500;
 }
 .error-message {
-  color: #721c24; /* Darker red text */
-  background-color: #f8d7da; /* Lighter red background */
-  border: 1px solid #f5c6cb; /* Reddish border */
+  color: #721c24;
+  background-color: #f8d7da;
+  border: 1px solid #f5c6cb;
 }
 .success-message {
-  color: #155724; /* Darker green text */
-  background-color: #d4edda; /* Lighter green background */
-  border: 1px solid #c3e6cb; /* Greenish border */
+  color: #155724;
+  background-color: #d4edda;
+  border: 1px solid #c3e6cb;
 }
 
 /* Back Button & Form Actions */
@@ -1036,23 +1181,19 @@ body {
 }
 .form-actions {
   display: flex;
-  justify-content: space-between; /* Default */
+  justify-content: space-between;
   align-items: center;
   margin-top: 1.5rem;
-}
-.form-actions .action-button {
-  /* Ensure form buttons take priority if specific classes are used */
-  /* width: auto; Allow natural sizing */
 }
 
 /* Footer Styles */
 .app-footer {
   background-color: var(--footer-bg-color);
-  color: #adb5bd; /* Lighter grey for footer text */
+  color: #adb5bd;
   padding: 1.5rem 1rem;
   font-size: 0.85rem;
   text-align: center;
-  margin-top: auto; /* Push to bottom */
+  margin-top: auto;
 }
 
 /* Loading Indicator */
@@ -1084,8 +1225,9 @@ body {
     gap: 0.5rem;
   }
   .app-header .header-link,
-  .app-header .return-to-admin-link {
-    /* Include new button */
+  .app-header .return-to-admin-link,
+  .app-header .notification-bell-container {
+    /* Include notification bell */
     width: 100%;
     justify-content: center;
   }
@@ -1098,8 +1240,7 @@ body {
 @media (max-width: 600px) {
   :root {
     --font-size-base: 0.95rem;
-  } /* Slightly smaller base font for small screens */
-
+  }
   .app-header {
     padding: 0.75rem 1rem;
   }
@@ -1109,14 +1250,12 @@ body {
   .app-header h1 {
     font-size: 1.4rem;
   }
-
   .intro-section .intro-title {
     font-size: 1.5rem;
   }
   .intro-section p {
     font-size: 1rem;
   }
-
   .actions-nav .action-button {
     width: 100%;
     max-width: 320px;
@@ -1131,7 +1270,6 @@ body {
   .form-view h2 {
     font-size: 1.5rem;
   }
-
   .form-actions {
     flex-direction: column;
   }
@@ -1139,13 +1277,13 @@ body {
     width: 100%;
     margin-bottom: 0.75rem;
   }
-  .form-actions .action-button.secondary-action, /* E.g. cancel button */
-   .form-actions .back-button {
-    margin-top: 0.5rem; /* Spacing for secondary actions below primary */
-    order: 2; /* Push them below primary action */
+  .form-actions .action-button.secondary-action,
+  .form-actions .back-button {
+    margin-top: 0.5rem;
+    order: 2;
   }
   .form-actions .action-button:not(.secondary-action) {
-    order: 1; /* Primary action first */
+    order: 1;
   }
   .form-actions .back-button {
     align-self: center;

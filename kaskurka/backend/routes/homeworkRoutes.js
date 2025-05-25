@@ -14,6 +14,25 @@ const upload = multer({
   }
 }).array('files', 5);
 
+// Helper function to create notifications (can be moved to a service later)
+async function createNotification(db, recipientUserId, type, message, link, relatedItemId, relatedItemType) {
+  try {
+    const notificationsCollection = db.collection('notifications');
+    await notificationsCollection.insertOne({
+      userId: recipientUserId,
+      type: type,
+      message: message,
+      link: link || null,
+      isRead: false,
+      createdAt: new Date(),
+      relatedItemId: relatedItemId ? new ObjectId(relatedItemId) : null,
+      relatedItemType: relatedItemType || null,
+    });
+  } catch (error) {
+    console.error(`Error creating notification for user ${recipientUserId}:`, error);
+  }
+}
+
 // @route   POST api/homework
 // @desc    Add a new homework assignment
 // @access  Private
@@ -28,7 +47,7 @@ router.post('/', authMiddleware, async (req, res) => {
       return res.status(400).json({ msg: err.message || 'Neatļauts faila tips vai cita augšupielādes kļūda.' });
     }
 
-    const { subject, description, dueDate, additionalInfo, links, customGroupId } = req.body; // Added customGroupId
+    const { subject, description, dueDate, additionalInfo, links, customGroupId } = req.body;
     const errors = [];
 
     if (!subject || subject.trim() === '') errors.push('Mācību priekšmets ir obligāts lauks.');
@@ -58,31 +77,31 @@ router.post('/', authMiddleware, async (req, res) => {
     try {
       const db = getDB();
       const homeworkCollection = db.collection('homeworks');
-      const usersCollection = db.collection('users'); // To check group membership
+      const usersCollection = db.collection('users');
+      const groupsCollection = db.collection('groups');
 
       const userCreating = await usersCollection.findOne({ _id: new ObjectId(req.user.id) });
       if (!userCreating) {
         return res.status(404).json({ msg: 'Lietotājs nav atrasts.' });
       }
 
-      // Validate customGroupId membership for students
+      const groupObjectId = new ObjectId(customGroupId);
+      const targetGroup = await groupsCollection.findOne({ _id: groupObjectId });
+      if (!targetGroup) {
+        return res.status(400).json({ msg: 'Norādītā grupa neeksistē.' });
+      }
+
       if (req.user.role === 'student') {
         const enrolledIds = (userCreating.enrolledCustomGroups || []).map(id => id.toString());
         if (!enrolledIds.includes(customGroupId)) {
           return res.status(403).json({ msg: 'Jums nav tiesību pievienot mājasdarbu šai grupai.' });
         }
-      } else if (req.user.role === 'admin') {
-        // Admin can post to any group, check if group exists
-        const groupExists = await db.collection('groups').findOne({ _id: new ObjectId(customGroupId) });
-        if (!groupExists) {
-          return res.status(400).json({ msg: 'Norādītā grupa neeksistē.' });
-        }
       }
-
+      // Admin can post to any group (already checked if group exists)
 
       const fileAttachments = req.files ? req.files.map(file => ({
         originalName: file.originalname, mimeType: file.mimetype, size: file.size,
-        storageReference: `Stored in memory (transient) - ${file.originalname}`
+        storageReference: `Stored in memory (transient) - ${file.originalname}` // Placeholder for actual storage
       })) : [];
 
       const newHomework = {
@@ -91,34 +110,42 @@ router.post('/', authMiddleware, async (req, res) => {
         fileAttachments,
         userId: new ObjectId(req.user.id),
         userFirstName: req.user.firstName,
-        userGroup: req.user.group, // Creator's registration group for display
+        userGroup: req.user.group,
         userStudyStartYear: req.user.studyStartYear,
-        customGroupId: new ObjectId(customGroupId), // The custom group this item belongs to
+        customGroupId: groupObjectId,
         createdAt: new Date(),
         updatedAt: new Date(),
         type: 'homework'
       };
       const result = await homeworkCollection.insertOne(newHomework);
-      const createdHomeworkWithGroup = await homeworkCollection.aggregate([
-        { $match: { _id: result.insertedId } },
-        {
-          $lookup: {
-            from: 'groups',
-            localField: 'customGroupId',
-            foreignField: '_id',
-            as: 'groupInfo'
-          }
-        },
-        { $unwind: { path: '$groupInfo', preserveNullAndEmptyArrays: true } },
-        {
-          $addFields: {
-            customGroupName: { $ifNull: ['$groupInfo.name', 'Nezināma grupa'] }
-          }
-        },
-        { $project: { groupInfo: 0 } }
-      ]).toArray();
+      const createdHomework = await homeworkCollection.findOne({ _id: result.insertedId });
 
-      res.status(201).json({ msg: 'Mājasdarbs veiksmīgi pievienots!', homework: createdHomeworkWithGroup[0] || newHomework });
+      // Add groupName to the returned object for immediate display
+      createdHomework.customGroupName = targetGroup.name;
+
+
+      // Create notifications for group members
+      if (targetGroup.members && targetGroup.members.length > 0) {
+        const notificationMessage = `Grupai '${targetGroup.name}' pievienots jauns mājasdarbs: "${createdHomework.subject}".`;
+        const notificationLink = `/homework-list`; // Or a direct link to the item if a view for that exists
+
+        for (const memberId of targetGroup.members) {
+          if (memberId.toString() !== req.user.id) { // Don't notify the creator
+            await createNotification(
+              db,
+              memberId,
+              'NEW_HOMEWORK',
+              notificationMessage,
+              notificationLink,
+              createdHomework._id,
+              'homework'
+            );
+          }
+        }
+      }
+
+      res.status(201).json({ msg: 'Mājasdarbs veiksmīgi pievienots!', homework: createdHomework });
+
     } catch (err) {
       console.error('Error adding homework:', err);
       res.status(500).json({ msg: 'Servera kļūda pievienojot mājasdarbu.' });
@@ -134,7 +161,7 @@ router.get('/', authMiddleware, async (req, res) => {
     const db = getDB();
     const homeworkCollection = db.collection('homeworks');
     const today = new Date();
-    today.setHours(0, 0, 0, 0); // Start of today
+    today.setHours(0, 0, 0, 0);
 
     let initialMatch = {};
     if (req.user.role === 'student') {
@@ -149,7 +176,8 @@ router.get('/', authMiddleware, async (req, res) => {
       return res.status(403).json({ msg: "Nezināma lietotāja loma." });
     }
 
-    initialMatch.dueDate = { $gte: today }; // Only upcoming or today's homework
+    // No date filter here, fetch all and let frontend filter/sort initially for list view
+    // initialMatch.dueDate = { $gte: today }; // Removed to show all in HomeworkList view
 
     const homeworks = await homeworkCollection.aggregate([
       { $match: initialMatch },
@@ -167,8 +195,8 @@ router.get('/', authMiddleware, async (req, res) => {
           customGroupName: { $ifNull: ['$groupInfo.name', 'Nezināma grupa'] }
         }
       },
-      { $project: { groupInfo: 0 } }, // Remove the full groupInfo object
-      { $sort: { dueDate: 1 } } // Sort by due date ascending (closest first)
+      { $project: { groupInfo: 0 } },
+      { $sort: { dueDate: 1, createdAt: -1 } }
     ]).toArray();
 
     res.json(homeworks);
@@ -371,6 +399,7 @@ router.delete('/:id', authMiddleware, async (req, res) => {
     const homeworkCollection = db.collection('homeworks');
     const progressCollection = db.collection('userItemProgress');
     const commentsCollection = db.collection('comments');
+    const notificationsCollection = db.collection('notifications');
     const itemObjectId = new ObjectId(homeworkId);
 
     const homeworkToDelete = await homeworkCollection.findOne({ _id: itemObjectId });
@@ -389,6 +418,9 @@ router.delete('/:id', authMiddleware, async (req, res) => {
 
     await progressCollection.deleteMany({ itemId: itemObjectId });
     await commentsCollection.deleteMany({ itemId: itemObjectId });
+    await notificationsCollection.deleteMany({ relatedItemId: itemObjectId, relatedItemType: 'homework' });
+    await notificationsCollection.deleteMany({ relatedItemId: itemObjectId, relatedItemType: 'comment' }); // If comments link to homework
+
 
     res.json({ msg: 'Mājasdarbs veiksmīgi dzēsts.' });
   } catch (err) {

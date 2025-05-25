@@ -4,6 +4,25 @@ const { getDB } = require('../config/db');
 const authMiddleware = require('../middleware/authMiddleware');
 const { ObjectId } = require('mongodb');
 
+// Helper function to create notifications (can be moved to a service later)
+async function createNotification(db, recipientUserId, type, message, link, relatedItemId, relatedItemType) {
+  try {
+    const notificationsCollection = db.collection('notifications');
+    await notificationsCollection.insertOne({
+      userId: recipientUserId,
+      type: type,
+      message: message,
+      link: link || null,
+      isRead: false,
+      createdAt: new Date(),
+      relatedItemId: relatedItemId ? new ObjectId(relatedItemId) : null,
+      relatedItemType: relatedItemType || null,
+    });
+  } catch (error) {
+    console.error(`Error creating notification for user ${recipientUserId}:`, error);
+  }
+}
+
 // @route   POST api/tests
 // @desc    Add a new test/examination entry
 // @access  Private
@@ -30,10 +49,17 @@ router.post('/', authMiddleware, async (req, res) => {
     const db = getDB();
     const testsCollection = db.collection('tests');
     const usersCollection = db.collection('users');
+    const groupsCollection = db.collection('groups');
 
     const userCreating = await usersCollection.findOne({ _id: new ObjectId(req.user.id) });
     if (!userCreating) {
       return res.status(404).json({ msg: 'Lietotājs nav atrasts.' });
+    }
+
+    const groupObjectId = new ObjectId(customGroupId);
+    const targetGroup = await groupsCollection.findOne({ _id: groupObjectId });
+    if (!targetGroup) {
+      return res.status(400).json({ msg: 'Norādītā grupa neeksistē.' });
     }
 
     if (req.user.role === 'student') {
@@ -41,12 +67,9 @@ router.post('/', authMiddleware, async (req, res) => {
       if (!enrolledIds.includes(customGroupId)) {
         return res.status(403).json({ msg: 'Jums nav tiesību pievienot pārbaudes darbu šai grupai.' });
       }
-    } else if (req.user.role === 'admin') {
-      const groupExists = await db.collection('groups').findOne({ _id: new ObjectId(customGroupId) });
-      if (!groupExists) {
-        return res.status(400).json({ msg: 'Norādītā grupa neeksistē.' });
-      }
     }
+    // Admin can post to any group (already checked if group exists)
+
 
     const newTest = {
       subject, eventDate: new Date(eventDate), eventTime: eventTime || '', topics: topics || '',
@@ -55,32 +78,38 @@ router.post('/', authMiddleware, async (req, res) => {
       userFirstName: req.user.firstName,
       userGroup: req.user.group,
       userStudyStartYear: req.user.studyStartYear,
-      customGroupId: new ObjectId(customGroupId),
+      customGroupId: groupObjectId,
       createdAt: new Date(),
       updatedAt: new Date(),
       type: 'test'
     };
     const result = await testsCollection.insertOne(newTest);
-    const createdTestWithGroup = await testsCollection.aggregate([
-      { $match: { _id: result.insertedId } },
-      {
-        $lookup: {
-          from: 'groups',
-          localField: 'customGroupId',
-          foreignField: '_id',
-          as: 'groupInfo'
-        }
-      },
-      { $unwind: { path: '$groupInfo', preserveNullAndEmptyArrays: true } },
-      {
-        $addFields: {
-          customGroupName: { $ifNull: ['$groupInfo.name', 'Nezināma grupa'] }
-        }
-      },
-      { $project: { groupInfo: 0 } }
-    ]).toArray();
+    const createdTest = await testsCollection.findOne({ _id: result.insertedId });
 
-    res.status(201).json({ msg: 'Pārbaudes darbs veiksmīgi pievienots!', test: createdTestWithGroup[0] || newTest });
+    // Add groupName to the returned object for immediate display
+    createdTest.customGroupName = targetGroup.name;
+
+    // Create notifications for group members
+    if (targetGroup.members && targetGroup.members.length > 0) {
+      const notificationMessage = `Grupai '${targetGroup.name}' pievienots jauns pārbaudes darbs: "${createdTest.subject}".`;
+      const notificationLink = `/homework-list`; // Or a direct link to the item view
+
+      for (const memberId of targetGroup.members) {
+        if (memberId.toString() !== req.user.id) { // Don't notify the creator
+          await createNotification(
+            db,
+            memberId,
+            'NEW_TEST',
+            notificationMessage,
+            notificationLink,
+            createdTest._id,
+            'test'
+          );
+        }
+      }
+    }
+
+    res.status(201).json({ msg: 'Pārbaudes darbs veiksmīgi pievienots!', test: createdTest });
   } catch (err) {
     console.error('Error adding test:', err);
     res.status(500).json({ msg: 'Servera kļūda pievienojot pārbaudes darbu.' });
@@ -95,7 +124,7 @@ router.get('/', authMiddleware, async (req, res) => {
     const db = getDB();
     const testsCollection = db.collection('tests');
     const today = new Date();
-    today.setHours(0, 0, 0, 0); // Start of today
+    today.setHours(0, 0, 0, 0);
 
     let initialMatch = {};
     if (req.user.role === 'student') {
@@ -110,7 +139,8 @@ router.get('/', authMiddleware, async (req, res) => {
       return res.status(403).json({ msg: "Nezināma lietotāja loma." });
     }
 
-    initialMatch.eventDate = { $gte: today }; // Only upcoming or today's tests
+    // No date filter here, fetch all and let frontend filter/sort initially for list view
+    // initialMatch.eventDate = { $gte: today }; // Removed to show all in HomeworkList view
 
     const tests = await testsCollection.aggregate([
       { $match: initialMatch },
@@ -129,7 +159,7 @@ router.get('/', authMiddleware, async (req, res) => {
         }
       },
       { $project: { groupInfo: 0 } },
-      { $sort: { eventDate: 1 } } // Sort by event date ascending (closest first)
+      { $sort: { eventDate: 1, createdAt: -1 } }
     ]).toArray();
 
     res.json(tests);
@@ -304,6 +334,7 @@ router.delete('/:id', authMiddleware, async (req, res) => {
     const testsCollection = db.collection('tests');
     const progressCollection = db.collection('userItemProgress');
     const commentsCollection = db.collection('comments');
+    const notificationsCollection = db.collection('notifications');
     const itemObjectId = new ObjectId(testId);
 
     const testToDelete = await testsCollection.findOne({ _id: itemObjectId });
@@ -322,6 +353,9 @@ router.delete('/:id', authMiddleware, async (req, res) => {
 
     await progressCollection.deleteMany({ itemId: itemObjectId });
     await commentsCollection.deleteMany({ itemId: itemObjectId });
+    await notificationsCollection.deleteMany({ relatedItemId: itemObjectId, relatedItemType: 'test' });
+    await notificationsCollection.deleteMany({ relatedItemId: itemObjectId, relatedItemType: 'comment' });
+
 
     res.json({ msg: 'Pārbaudes darbs veiksmīgi dzēsts.' });
   } catch (err) {
