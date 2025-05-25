@@ -1,17 +1,28 @@
-<!-- kaskurka/src/views/HomeworkListView.vue -->
 <template>
   <div class="homework-list-view card-style">
-    <button @click="goBackToDashboard" class="back-button" :disabled="isLoading || isUpdatingProgress || isDeleting">
+    <button
+      @click="goBackToDashboard"
+      class="back-button"
+      :disabled="isLoading || isUpdatingProgress || isDeleting"
+    >
       <i class="fas fa-arrow-left"></i> Atpakaļ uz Paneli
     </button>
-    <h2 class="view-title"><i class="fas fa-clipboard-list"></i> Darbu Saraksts</h2>
+    <h2 class="view-title">
+      <i class="fas fa-clipboard-list"></i> Darbu Saraksts
+    </h2>
 
     <div class="filters-panel card-style-inner">
-      <h3 class="filters-title"><i class="fas fa-filter"></i> Filtri un Kārtošana</h3>
+      <h3 class="filters-title">
+        <i class="fas fa-filter"></i> Filtri un Kārtošana
+      </h3>
       <div class="filters-grid">
         <div class="form-group">
           <label for="typeFilter">Tips:</label>
-          <select id="typeFilter" v-model="typeFilter" :disabled="isLoading || isUpdatingProgress || isDeleting">
+          <select
+            id="typeFilter"
+            v-model="typeFilter"
+            :disabled="isLoading || isUpdatingProgress || isDeleting"
+          >
             <option value="">Visi Tipi</option>
             <option value="homework">Mājasdarbi</option>
             <option value="test">Pārbaudes Darbi</option>
@@ -19,20 +30,46 @@
         </div>
         <div class="form-group">
           <label for="subjectFilter">Priekšmets:</label>
-          <input type="text" id="subjectFilter" v-model="subjectFilter" @input="applyFiltersDebounced" placeholder="Meklēt priekšmetu..." :disabled="isLoading || isUpdatingProgress || isDeleting" />
+          <input
+            type="text"
+            id="subjectFilter"
+            v-model="subjectFilter"
+            placeholder="Meklēt priekšmetu..."
+            :disabled="isLoading || isUpdatingProgress || isDeleting"
+          />
         </div>
-         <div class="form-group">
+        <div class="form-group">
           <label for="groupFilter">Grupa:</label>
-          <select id="groupFilter" v-model="groupFilter" :disabled="isLoading || isUpdatingProgress || isDeleting || uniqueCustomGroupNames.length <= 1">
+          <select
+            id="groupFilter"
+            v-model="groupFilter"
+            :disabled="
+              isLoading ||
+              isUpdatingProgress ||
+              isDeleting ||
+              uniqueCustomGroupNames.length === 0
+            "
+          >
             <option value="">Visas Manas Grupas</option>
-            <option v-for="groupName in uniqueCustomGroupNames" :key="groupName" :value="groupName">
+            <option
+              v-for="groupName in uniqueCustomGroupNames"
+              :key="groupName"
+              :value="groupName"
+            >
               {{ groupName }}
             </option>
           </select>
+          <small v-if="uniqueCustomGroupNames.length === 0 && !isLoading"
+            >Nav grupu, ko filtrēt.</small
+          >
         </div>
         <div class="form-group">
           <label for="sortBy">Kārtot pēc:</label>
-          <select id="sortBy" v-model="sortBy" :disabled="isLoading || isUpdatingProgress || isDeleting">
+          <select
+            id="sortBy"
+            v-model="sortBy"
+            :disabled="isLoading || isUpdatingProgress || isDeleting"
+          >
             <option value="date_desc">Datums (Tuvākie)</option>
             <option value="date_asc">Datums (Tālākie)</option>
             <option value="subject_asc">Priekšmets (A-Z)</option>
@@ -43,111 +80,299 @@
       </div>
     </div>
 
-    <div v-if="isLoading" class="loading-indicator"><i class="fas fa-spinner fa-spin"></i> Notiek ielāde...</div>
-    <div v-else-if="errorMessage" class="error-message"><i class="fas fa-exclamation-triangle"></i> {{ errorMessage }}</div>
-    <div v-else-if="filteredAndSortedItems.length === 0" class="empty-list-message card-style-inner">
-      <i class="fas fa-folder-open fa-3x"></i>
-      <p>Pēc jūsu izvēlētajiem kritērijiem nekas nav atrasts, vai arī saraksts ir tukšs.</p>
-      <p v-if="typeFilter || subjectFilter || groupFilter">Mēģiniet mainīt filtru iestatījumus.</p>
+    <div v-if="isLoading" class="loading-indicator">
+      <i class="fas fa-spinner fa-spin"></i> Notiek ielāde...
     </div>
-    
+    <div v-else-if="errorMessage" class="error-message">
+      <i class="fas fa-exclamation-triangle"></i> {{ errorMessage }}
+    </div>
+    <div
+      v-else-if="filteredAndSortedItems.length === 0"
+      class="empty-list-message card-style-inner"
+    >
+      <i class="fas fa-folder-open fa-3x"></i>
+      <p>
+        Pēc jūsu izvēlētajiem kritērijiem nekas nav atrasts, vai arī saraksts ir
+        tukšs.
+      </p>
+      <p v-if="typeFilter || subjectFilter || groupFilter">
+        Mēģiniet mainīt filtru iestatījumus.
+      </p>
+    </div>
+
     <div v-else class="items-container">
-      <div v-for="item in filteredAndSortedItems" :key="item._id" 
-           class="list-item card-style-inner" 
-           :class="[item.type, { 'item-done': item.isDone }]"
+      <div
+        v-for="item in filteredAndSortedItems"
+        :key="item._id"
+        class="list-item card-style-inner"
+        :class="[item.type, { 'item-done': item.isDone }]"
       >
         <div class="item-main-info">
-            <div class="item-type-icon" :class="item.type">
-                <i :class="item.type === 'homework' ? 'fas fa-book-reader' : 'fas fa-feather-alt'"></i>
-            </div>
-            <div class="item-details">
-                <h3 class="item-subject">{{ item.subject }}</h3>
-                <span class="item-type-badge" :class="item.type">{{ item.type === 'homework' ? 'Mājasdarbs' : 'Pārbaudes Darbs' }}</span>
-                <p class="item-date">
-                    <i class="fas fa-calendar-alt"></i>
-                    {{ item.type === 'homework' ? 'Termiņš' : 'Norise' }}: 
-                    <strong>{{ formatDate(item.type === 'homework' ? item.dueDate : item.eventDate) }}</strong>
-                    <span v-if="item.type === 'test' && item.eventTime">, {{ item.eventTime }}</span>
-                </p>
-                 <p class="item-group-display"><i class="fas fa-layer-group"></i> Grupa: {{ item.customGroupName || 'Nezināma' }}</p>
-            </div>
+          <div class="item-type-icon" :class="item.type">
+            <i
+              :class="
+                item.type === 'homework'
+                  ? 'fas fa-book-reader'
+                  : 'fas fa-feather-alt'
+              "
+            ></i>
+          </div>
+          <div class="item-details">
+            <h3 class="item-subject">{{ item.subject }}</h3>
+            <span class="item-type-badge" :class="item.type">{{
+              item.type === "homework" ? "Mājasdarbs" : "Pārbaudes Darbs"
+            }}</span>
+            <p class="item-date">
+              <i class="fas fa-calendar-alt"></i>
+              {{ item.type === "homework" ? "Termiņš" : "Norise" }}:
+              <strong>{{
+                formatDate(
+                  item.type === "homework" ? item.dueDate : item.eventDate
+                )
+              }}</strong>
+              <span v-if="item.type === 'test' && item.eventTime"
+                >, {{ item.eventTime }}</span
+              >
+            </p>
+            <p class="item-group-display">
+              <i class="fas fa-layer-group"></i> Grupa:
+              {{ item.customGroupName || "Nezināma" }}
+            </p>
+          </div>
         </div>
-        
-        <div class="item-content collapsible-content" :class="{ 'expanded': item.expanded }">
-          <p class="item-description"><strong>Apraksts:</strong> {{ item.description || item.topics || 'Nav norādīts' }}</p>
-          <p v-if="item.additionalInfo" class="item-additional-info"><strong>Papildus Info:</strong> {{ item.additionalInfo }}</p>
-          
+
+        <div
+          class="item-content collapsible-content"
+          :class="{ expanded: item.expanded }"
+        >
+          <p class="item-description">
+            <strong>Apraksts:</strong>
+            {{ item.description || item.topics || "Nav norādīts" }}
+          </p>
+          <p v-if="item.additionalInfo" class="item-additional-info">
+            <strong>Papildus Info:</strong> {{ item.additionalInfo }}
+          </p>
+
           <div v-if="item.links && item.links.length > 0" class="item-links">
             <strong><i class="fas fa-link"></i> Saites:</strong>
-            <ul><li v-for="(link, index) in item.links" :key="index"><a :href="link" target="_blank" rel="noopener noreferrer">{{ link }}</a></li></ul>
+            <ul>
+              <li v-for="(link, index) in item.links" :key="index">
+                <a :href="link" target="_blank" rel="noopener noreferrer">{{
+                  link
+                }}</a>
+              </li>
+            </ul>
           </div>
-          
-          <div v-if="item.fileAttachments && item.fileAttachments.length > 0" class="item-files">
+
+          <div
+            v-if="item.fileAttachments && item.fileAttachments.length > 0"
+            class="item-files"
+          >
             <strong><i class="fas fa-paperclip"></i> Pievienotie Faili:</strong>
-            <ul><li v-for="(file, index) in item.fileAttachments" :key="index" class="file-entry"><i class="fas fa-file"></i> {{ file.originalName }} <span class="file-size">({{ (file.size / 1024).toFixed(2) }} KB)</span></li></ul>
+            <ul>
+              <li
+                v-for="(file, index) in item.fileAttachments"
+                :key="index"
+                class="file-entry"
+              >
+                <i class="fas fa-file"></i> {{ file.originalName }}
+                <span class="file-size"
+                  >({{ (file.size / 1024).toFixed(2) }} KB)</span
+                >
+              </li>
+            </ul>
           </div>
-          
+
           <div class="item-meta">
-            <p class="item-author"><i class="fas fa-user-edit"></i> Pievienoja: {{ item.userFirstName }} ({{ item.userGroup }})</p>
-            <p class="item-added-date"><i class="fas fa-clock"></i> Pievienots: {{ formatDate(item.createdAt, true) }}</p>
+            <p class="item-author">
+              <i class="fas fa-user-edit"></i> Pievienoja:
+              {{ item.userFirstName }} ({{ item.userGroup }})
+            </p>
+            <p class="item-added-date">
+              <i class="fas fa-clock"></i> Pievienots:
+              {{ formatDate(item.createdAt, true) }}
+            </p>
           </div>
         </div>
 
         <div class="item-actions-footer">
-            <div class="main-actions">
-                <label class="progress-checkbox-label" :for="'progress-' + item._id" title="Atzīmēt kā izpildītu/neizpildītu">
-                    <input type="checkbox" :id="'progress-' + item._id" :checked="item.isDone" @change="toggleProgress(item)" :disabled="isUpdatingProgress || isDeleting || isCommentingBusy(item._id)"/>
-                    <i :class="item.isDone ? 'fas fa-check-square' : 'far fa-square'"></i>
-                    <span>{{ item.isDone ? 'Izpildīts' : 'Nav Izpildīts' }}</span>
-                </label>
-                <button @click="toggleItemExpansion(item._id)" class="action-button-small expand-toggle" :title="item.expanded ? 'Slēpt detaļas' : 'Rādīt detaļas'">
-                    <i :class="item.expanded ? 'fas fa-chevron-up' : 'fas fa-chevron-down'"></i> {{ item.expanded ? 'Mazāk' : 'Vairāk' }}
-                </button>
+          <div class="main-actions">
+            <label
+              class="progress-checkbox-label"
+              :for="'progress-' + item._id"
+              title="Atzīmēt kā izpildītu/neizpildītu"
+            >
+              <input
+                type="checkbox"
+                :id="'progress-' + item._id"
+                :checked="item.isDone"
+                @change="toggleProgress(item)"
+                :disabled="
+                  isUpdatingProgress || isDeleting || isCommentingBusy(item._id)
+                "
+              />
+              <i
+                :class="item.isDone ? 'fas fa-check-square' : 'far fa-square'"
+              ></i>
+              <span>{{ item.isDone ? "Izpildīts" : "Nav Izpildīts" }}</span>
+            </label>
+            <button
+              @click="toggleItemExpansion(item._id)"
+              class="action-button-small expand-toggle"
+              :title="item.expanded ? 'Slēpt detaļas' : 'Rādīt detaļas'"
+            >
+              <i
+                :class="
+                  item.expanded ? 'fas fa-chevron-up' : 'fas fa-chevron-down'
+                "
+              ></i>
+              {{ item.expanded ? "Mazāk" : "Vairāk" }}
+            </button>
+          </div>
+          <div class="contextual-actions">
+            <button
+              @click="toggleComments(item._id)"
+              class="action-button-small comments-toggle"
+              :disabled="isCommentingBusy(item._id)"
+              :title="
+                itemComments[item._id] && itemComments[item._id].show
+                  ? 'Slēpt komentārus'
+                  : 'Rādīt/Pievienot komentārus'
+              "
+            >
+              <i class="fas fa-comments"></i> Komentāri
+              <span
+                v-if="
+                  itemComments[item._id] &&
+                  itemComments[item._id].list.length > 0
+                "
+                class="comment-count"
+              >
+                ({{ itemComments[item._id].list.length }})</span
+              >
+            </button>
+            <div
+              v-if="
+                currentUserId &&
+                (item.userId === currentUserId || currentUserRole === 'admin')
+              "
+              class="owner-admin-actions"
+            >
+              <button
+                @click="editItem(item)"
+                class="action-button-small edit-btn"
+                :disabled="
+                  isUpdatingProgress || isDeleting || isCommentingBusy(item._id)
+                "
+                title="Rediģēt"
+              >
+                <i class="fas fa-edit"></i>
+              </button>
+              <button
+                @click="confirmDeleteItem(item)"
+                class="action-button-small delete-btn"
+                :disabled="
+                  isUpdatingProgress || isDeleting || isCommentingBusy(item._id)
+                "
+                title="Dzēst"
+              >
+                <i class="fas fa-trash-alt"></i>
+              </button>
             </div>
-            <div class="contextual-actions">
-                <button @click="toggleComments(item._id)" class="action-button-small comments-toggle" :disabled="isCommentingBusy(item._id)" :title="itemComments[item._id] && itemComments[item._id].show ? 'Slēpt komentārus' : 'Rādīt/Pievienot komentārus'">
-                    <i class="fas fa-comments"></i> Komentāri
-                    <span v-if="itemComments[item._id] && itemComments[item._id].list.length > 0" class="comment-count"> ({{ itemComments[item._id].list.length }})</span>
-                </button>
-                <div v-if="currentUserId && (item.userId === currentUserId || currentUserRole === 'admin')" class="owner-admin-actions">
-                    <button @click="editItem(item)" class="action-button-small edit-btn" :disabled="isUpdatingProgress || isDeleting || isCommentingBusy(item._id)" title="Rediģēt"><i class="fas fa-edit"></i></button>
-                    <button @click="confirmDeleteItem(item)" class="action-button-small delete-btn" :disabled="isUpdatingProgress || isDeleting || isCommentingBusy(item._id)" title="Dzēst"><i class="fas fa-trash-alt"></i></button>
-                </div>
-            </div>
+          </div>
         </div>
-        
-        <div v-if="itemComments[item._id] && itemComments[item._id].show" class="comments-area-wrapper">
-            <div class="comments-area card-style-inner">
-                <h4><i class="fas fa-comment-dots"></i> Komentāri par "{{ item.subject }}"</h4>
-                <div v-if="itemComments[item._id].isLoading" class="loading-indicator small"><i class="fas fa-spinner fa-spin"></i> Notiek komentāru ielāde...</div>
-                <div v-if="itemComments[item._id].error" class="error-message small"><i class="fas fa-exclamation-triangle"></i> {{ itemComments[item._id].error }}</div>
-                
-                <div v-if="!itemComments[item._id].isLoading && itemComments[item._id].list.length === 0 && !itemComments[item._id].error" class="no-comments">
-                    <i class="fas fa-comment-slash"></i> Nav komentāru. Esi pirmais!
-                </div>
-                <ul v-else-if="!itemComments[item._id].isLoading" class="comments-list">
-                    <li v-for="comment in itemComments[item._id].list" :key="comment._id" class="comment-item">
-                        <p class="comment-text">{{ comment.text }}</p>
-                        <p class="comment-meta">
-                            <span><i class="fas fa-user"></i> {{ comment.userName }}</span>
-                            <span><i class="fas fa-clock"></i> {{ formatDate(comment.createdAt, true) }}</span>
-                            <button 
-                                v-if="currentUserId === comment.userId || currentUserRole === 'admin'" 
-                                @click="deleteComment(item._id, comment._id)" 
-                                class="delete-comment-btn"
-                                :disabled="isCommentingBusy(item._id)"
-                                title="Dzēst komentāru"><i class="fas fa-times-circle"></i></button>
-                        </p>
-                    </li>
-                </ul>
 
-                <form @submit.prevent="addComment(item._id)" class="add-comment-form">
-                    <textarea v-model="newCommentText[item._id]" placeholder="Rakstiet savu komentāru šeit..." rows="3" :disabled="isCommentingBusy(item._id)"></textarea>
-                    <button type="submit" class="action-button primary-button" :disabled="!newCommentText[item._id] || !newCommentText[item._id].trim() || isCommentingBusy(item._id)">
-                        <i class="fas fa-paper-plane"></i> Pievienot Komentāru
-                    </button>
-                </form>
+        <div
+          v-if="itemComments[item._id] && itemComments[item._id].show"
+          class="comments-area-wrapper"
+        >
+          <div class="comments-area card-style-inner">
+            <h4>
+              <i class="fas fa-comment-dots"></i> Komentāri par "{{
+                item.subject
+              }}"
+            </h4>
+            <div
+              v-if="itemComments[item._id].isLoading"
+              class="loading-indicator small"
+            >
+              <i class="fas fa-spinner fa-spin"></i> Notiek komentāru ielāde...
             </div>
+            <div
+              v-if="itemComments[item._id].error"
+              class="error-message small"
+            >
+              <i class="fas fa-exclamation-triangle"></i>
+              {{ itemComments[item._id].error }}
+            </div>
+
+            <div
+              v-if="
+                !itemComments[item._id].isLoading &&
+                itemComments[item._id].list.length === 0 &&
+                !itemComments[item._id].error
+              "
+              class="no-comments"
+            >
+              <i class="fas fa-comment-slash"></i> Nav komentāru. Esi pirmais!
+            </div>
+            <ul
+              v-else-if="!itemComments[item._id].isLoading"
+              class="comments-list"
+            >
+              <li
+                v-for="comment in itemComments[item._id].list"
+                :key="comment._id"
+                class="comment-item"
+              >
+                <p class="comment-text">{{ comment.text }}</p>
+                <p class="comment-meta">
+                  <span
+                    ><i class="fas fa-user"></i> {{ comment.userName }}</span
+                  >
+                  <span
+                    ><i class="fas fa-clock"></i>
+                    {{ formatDate(comment.createdAt, true) }}</span
+                  >
+                  <button
+                    v-if="
+                      currentUserId === comment.userId ||
+                      currentUserRole === 'admin'
+                    "
+                    @click="deleteComment(item._id, comment._id)"
+                    class="delete-comment-btn"
+                    :disabled="isCommentingBusy(item._id)"
+                    title="Dzēst komentāru"
+                  >
+                    <i class="fas fa-times-circle"></i>
+                  </button>
+                </p>
+              </li>
+            </ul>
+
+            <form
+              @submit.prevent="addComment(item._id)"
+              class="add-comment-form"
+            >
+              <textarea
+                v-model="newCommentText[item._id]"
+                placeholder="Rakstiet savu komentāru šeit..."
+                rows="3"
+                :disabled="isCommentingBusy(item._id)"
+              ></textarea>
+              <button
+                type="submit"
+                class="action-button primary-button"
+                :disabled="
+                  !newCommentText[item._id] ||
+                  !newCommentText[item._id].trim() ||
+                  isCommentingBusy(item._id)
+                "
+              >
+                <i class="fas fa-paper-plane"></i> Pievienot Komentāru
+              </button>
+            </form>
+          </div>
         </div>
       </div>
     </div>
@@ -155,239 +380,306 @@
 </template>
 
 <script>
-import axios from 'axios';
-import _ from 'lodash';
+import axios from "axios";
+// import _ from 'lodash'; // Lodash is not used in this version due to v-model direct reactivity
 
 export default {
   name: "HomeworkListView",
   props: {
-      currentUserId: String,
-      currentUserRole: String,
+    currentUserId: String,
+    currentUserRole: String,
   },
   data() {
     return {
-      allItems: [], 
-      userProgress: {}, 
-      itemComments: {}, 
-      newCommentText: {}, 
-      commentingBusyStates: {}, 
+      allItems: [],
+      userProgress: {},
+      itemComments: {},
+      newCommentText: {},
+      commentingBusyStates: {},
       isLoading: true,
       isUpdatingProgress: false,
-      isDeleting: false, 
+      isDeleting: false,
       errorMessage: "",
-      typeFilter: "", 
+      typeFilter: "",
       subjectFilter: "",
       groupFilter: "",
-      sortBy: "date_desc", 
-      applyFiltersDebounced: null,
+      sortBy: "date_desc",
+      // applyFiltersDebounced is removed as it's not strictly needed with v-model and computed properties
     };
   },
   computed: {
     uniqueCustomGroupNames() {
       const groupNames = new Set();
-      this.allItems.forEach(item => {
-        if (item.customGroupName && item.customGroupName !== 'Nezināma grupa') {
+      this.allItems.forEach((item) => {
+        if (item.customGroupName && item.customGroupName !== "Nezināma grupa") {
           groupNames.add(item.customGroupName);
         }
       });
-      return Array.from(groupNames).sort();
+      return Array.from(groupNames).sort((a, b) => a.localeCompare(b));
     },
-    filteredAndSortedItems() { 
+    filteredAndSortedItems() {
       let itemsToDisplay = this.allItems
-        .map(item => ({
-          ...item, 
+        .map((item) => ({
+          ...item,
           isDone: !!this.userProgress[item._id],
         }))
-        .filter(item => {
+        .filter((item) => {
           if (this.typeFilter && item.type !== this.typeFilter) return false;
           if (this.subjectFilter.trim()) {
             const subjectQuery = this.subjectFilter.trim().toLowerCase();
-            if (!item.subject.toLowerCase().includes(subjectQuery)) return false;
+            if (!item.subject.toLowerCase().includes(subjectQuery))
+              return false;
           }
-          if (this.groupFilter && item.customGroupName !== this.groupFilter) return false;
+          if (this.groupFilter && item.customGroupName !== this.groupFilter)
+            return false;
           return true;
         })
         .sort((a, b) => {
-          const dateA = new Date(a.type === 'homework' ? a.dueDate : a.eventDate);
-          const dateB = new Date(b.type === 'homework' ? b.dueDate : b.eventDate);
+          const dateA = new Date(
+            a.type === "homework" ? a.dueDate : a.eventDate
+          );
+          const dateB = new Date(
+            b.type === "homework" ? b.dueDate : b.eventDate
+          );
           const createdA = new Date(a.createdAt);
           const createdB = new Date(b.createdAt);
 
           switch (this.sortBy) {
-            case 'date_asc': return dateA - dateB;
-            case 'date_desc': return dateB - dateA;
-            case 'subject_asc': return a.subject.localeCompare(b.subject);
-            case 'subject_desc': return b.subject.localeCompare(a.subject);
-            case 'added_desc': return createdB - createdA;
-            default: return dateB - dateA;
+            case "date_asc":
+              return dateA - dateB;
+            case "date_desc":
+              return dateB - dateA;
+            case "subject_asc":
+              return a.subject.localeCompare(b.subject);
+            case "subject_desc":
+              return b.subject.localeCompare(a.subject);
+            case "added_desc":
+              return createdB - createdA;
+            default:
+              return dateB - dateA; // Default to date_desc
           }
         });
       return itemsToDisplay;
-    }
+    },
   },
-   created() { 
-      this.fetchAllData(); 
-      this.applyFiltersDebounced = _.debounce(() => {
-        // This is intentionally left empty as the computed property `filteredAndSortedItems`
-        // will react automatically when `this.subjectFilter` (bound with v-model) changes.
-        // The debounce is applied to the v-model update itself implicitly by how it's used.
-        // Or, more explicitly, if you were calling a method:
-        // this.applyFilters(); 
-      }, 500);
+  created() {
+    this.fetchAllData();
+    // Debouncing for subjectFilter is handled by v-model's nature or can be added with a watcher if performance is an issue.
+    // For now, direct v-model updates are usually fine for client-side filtering.
   },
   methods: {
     toggleItemExpansion(itemId) {
-      const item = this.allItems.find(i => i._id === itemId);
-      if (item) {
-        item.expanded = !item.expanded;
+      const itemIndex = this.allItems.findIndex((i) => i._id === itemId);
+      if (itemIndex !== -1) {
+        // To ensure reactivity when modifying an array item's property,
+        // Vue 2 needed Vue.set or replacing the item. Vue 3 handles this better.
+        // Directly mutating should be fine if allItems is reactive.
+        // If issues, consider: this.allItems[itemIndex] = {...this.allItems[itemIndex], expanded: !this.allItems[itemIndex].expanded};
+        this.allItems[itemIndex].expanded = !this.allItems[itemIndex].expanded;
       }
     },
     isCommentingBusy(itemId) {
-        return !!this.commentingBusyStates[itemId];
+      return !!this.commentingBusyStates[itemId];
     },
     setCommentingBusy(itemId, state) {
-        this.commentingBusyStates = { ...this.commentingBusyStates, [itemId]: state };
+      this.commentingBusyStates = {
+        ...this.commentingBusyStates,
+        [itemId]: state,
+      };
     },
-    goBackToDashboard() { this.$emit("navigateToDashboard"); },
-    async fetchAllData() { 
+    goBackToDashboard() {
+      this.$emit("navigateToDashboard");
+    },
+    async fetchAllData() {
       this.isLoading = true;
       this.errorMessage = "";
       try {
         const [homeworkRes, testsRes, progressRes] = await Promise.all([
-          axios.get('/api/homework'),
-          axios.get('/api/tests'),
-          axios.get('/api/progress') 
+          axios.get("/api/homework"),
+          axios.get("/api/tests"),
+          axios.get("/api/progress"),
         ]);
-        this.allItems = [...homeworkRes.data, ...testsRes.data].map(item => {
-            if (!this.itemComments[item._id]) {
-                 this.itemComments[item._id] = { show: false, list: [], isLoading: false, error: null };
-            }
-             if (!this.newCommentText[item._id]) {
-                this.newCommentText[item._id] = "";
-            }
-            return { ...item, expanded: item.expanded === undefined ? false : item.expanded }; 
+
+        const combinedItems = [...homeworkRes.data, ...testsRes.data];
+        const initialItemComments = {};
+        const initialNewCommentText = {};
+
+        combinedItems.forEach((item) => {
+          initialItemComments[item._id] = {
+            show: false,
+            list: [],
+            isLoading: false,
+            error: null,
+          };
+          initialNewCommentText[item._id] = "";
         });
-        this.userProgress = progressRes.data; 
+        this.itemComments = initialItemComments;
+        this.newCommentText = initialNewCommentText;
+
+        this.allItems = combinedItems.map((item) => ({
+          ...item,
+          expanded: false,
+        }));
+        this.userProgress = progressRes.data;
       } catch (error) {
         console.error("Error fetching data:", error);
-        this.errorMessage = error.response?.data?.msg || "Kļūda ielādējot sarakstu.";
+        this.errorMessage =
+          error.response?.data?.msg || "Kļūda ielādējot sarakstu.";
       } finally {
         this.isLoading = false;
       }
     },
-    formatDate(dateString, includeTime = false) { 
-      if (!dateString) return 'N/A';
-      const options = { year: 'numeric', month: '2-digit', day: '2-digit' };
-      if (includeTime) { options.hour = '2-digit'; options.minute = '2-digit'; }
-      try { return new Date(dateString).toLocaleDateString('lv-LV', options); } 
-      catch (e) { return dateString; }
+    formatDate(dateString, includeTime = false) {
+      if (!dateString) return "N/A";
+      const options = { year: "numeric", month: "2-digit", day: "2-digit" };
+      if (includeTime) {
+        options.hour = "2-digit";
+        options.minute = "2-digit";
+      }
+      try {
+        return new Date(dateString).toLocaleDateString("lv-LV", options);
+      } catch (e) {
+        return dateString;
+      }
     },
-    applyFilters() {
-        // The computed property `filteredAndSortedItems` handles the actual filtering and sorting
-        // based on the data properties (typeFilter, subjectFilter, groupFilter, sortBy).
-        // This method is called by @change on selects, which updates the data properties,
-        // triggering the computed property to re-evaluate.
-    },
-    async toggleProgress(itemFromTemplate) { 
-        this.isUpdatingProgress = true;
-        const newStatus = !itemFromTemplate.isDone; 
-        
-        // The `itemFromTemplate` is a mapped object. We need to update the `userProgress`
-        // which `filteredAndSortedItems` uses to determine `isDone`.
-        try {
-            await axios.post('/api/progress', { itemId: itemFromTemplate._id, status: newStatus });
-            // Directly update userProgress for immediate UI feedback
-            this.userProgress = { ...this.userProgress, [itemFromTemplate._id]: newStatus };
-        } catch (error) {
-            console.error("Error updating progress:", error);
-            alert('Kļūda, atjauninot progresu.');
-            // Revert UI change if API call fails is handled by not updating userProgress on error
-        } finally {
-            this.isUpdatingProgress = false;
-        }
-    },
-    editItem(item) { 
-        this.$emit('editItem', { itemId: item._id, itemType: item.type });
-    },
-    async confirmDeleteItem(itemFromTemplate) { 
-        if (confirm(`Vai tiešām vēlaties dzēst ierakstu "${itemFromTemplate.subject}"? Šī darbība ir neatgriezeniska.`)) {
-            this.isDeleting = true;
-            this.errorMessage = "";
-            try {
-                const url = itemFromTemplate.type === 'homework' ? `/api/homework/${itemFromTemplate._id}` : `/api/tests/${itemFromTemplate._id}`;
-                const response = await axios.delete(url);
-                
-                this.allItems = this.allItems.filter(i => i._id !== itemFromTemplate._id);
-                
-                const newProgress = {...this.userProgress}; delete newProgress[itemFromTemplate._id]; this.userProgress = newProgress;
-                const newComments = {...this.itemComments}; delete newComments[itemFromTemplate._id]; this.itemComments = newComments;
-                const newCommentTexts = {...this.newCommentText}; delete newCommentTexts[itemFromTemplate._id]; this.newCommentText = newCommentTexts;
+    // applyFilters method is removed as computed property handles filtering reactively
+    async toggleProgress(itemFromTemplate) {
+      this.isUpdatingProgress = true;
+      const newStatus = !itemFromTemplate.isDone;
 
-                this.$emit('itemDeleted', response.data.msg || "Ieraksts veiksmīgi dzēsts.");
-            } catch (error) {
-                console.error("Error deleting item:", error);
-                this.errorMessage = error.response?.data?.msg || "Kļūda dzēšot ierakstu.";
-            } finally {
-                this.isDeleting = false;
-            }
+      try {
+        await axios.post("/api/progress", {
+          itemId: itemFromTemplate._id,
+          status: newStatus,
+        });
+        this.userProgress = {
+          ...this.userProgress,
+          [itemFromTemplate._id]: newStatus,
+        };
+      } catch (error) {
+        console.error("Error updating progress:", error);
+        alert("Kļūda, atjauninot progresu.");
+      } finally {
+        this.isUpdatingProgress = false;
+      }
+    },
+    editItem(item) {
+      this.$emit("editItem", { itemId: item._id, itemType: item.type });
+    },
+    async confirmDeleteItem(itemFromTemplate) {
+      if (
+        confirm(
+          `Vai tiešām vēlaties dzēst ierakstu "${itemFromTemplate.subject}"? Šī darbība ir neatgriezeniska.`
+        )
+      ) {
+        this.isDeleting = true;
+        this.errorMessage = "";
+        try {
+          const url =
+            itemFromTemplate.type === "homework"
+              ? `/api/homework/${itemFromTemplate._id}`
+              : `/api/tests/${itemFromTemplate._id}`;
+          const response = await axios.delete(url);
+
+          this.allItems = this.allItems.filter(
+            (i) => i._id !== itemFromTemplate._id
+          );
+
+          const newProgress = { ...this.userProgress };
+          delete newProgress[itemFromTemplate._id];
+          this.userProgress = newProgress;
+          const newComments = { ...this.itemComments };
+          delete newComments[itemFromTemplate._id];
+          this.itemComments = newComments;
+          const newCommentTexts = { ...this.newCommentText };
+          delete newCommentTexts[itemFromTemplate._id];
+          this.newCommentText = newCommentTexts;
+
+          this.$emit(
+            "itemDeleted",
+            response.data.msg || "Ieraksts veiksmīgi dzēsts."
+          );
+          alert(response.data.msg || "Ieraksts veiksmīgi dzēsts."); // Added alert for user feedback
+        } catch (error) {
+          console.error("Error deleting item:", error);
+          this.errorMessage =
+            error.response?.data?.msg || "Kļūda dzēšot ierakstu.";
+          alert(this.errorMessage); // Added alert for user feedback
+        } finally {
+          this.isDeleting = false;
         }
+      }
     },
     async toggleComments(itemId) {
-        if (!this.itemComments[itemId]) { 
-             this.itemComments[itemId] = { show: false, list: [], isLoading: false, error: null };
-        }
-        const currentItemComments = this.itemComments[itemId];
-        currentItemComments.show = !currentItemComments.show;
+      if (!this.itemComments[itemId]) {
+        this.itemComments[itemId] = {
+          show: false,
+          list: [],
+          isLoading: false,
+          error: null,
+        };
+      }
+      const currentItemComments = this.itemComments[itemId];
+      currentItemComments.show = !currentItemComments.show;
 
-        if (currentItemComments.show && currentItemComments.list.length === 0 && !currentItemComments.error) { 
-            currentItemComments.isLoading = true;
-            this.setCommentingBusy(itemId, true);
-            try {
-                const response = await axios.get(`/api/comments/${itemId}`);
-                currentItemComments.list = response.data;
-            } catch (error) {
-                console.error(`Error fetching comments for ${itemId}:`, error);
-                currentItemComments.error = error.response?.data?.msg || "Neizdevās ielādēt komentārus.";
-            } finally {
-                currentItemComments.isLoading = false;
-                this.setCommentingBusy(itemId, false);
-            }
+      if (
+        currentItemComments.show &&
+        currentItemComments.list.length === 0 &&
+        !currentItemComments.error
+      ) {
+        currentItemComments.isLoading = true;
+        this.setCommentingBusy(itemId, true);
+        try {
+          const response = await axios.get(`/api/comments/${itemId}`);
+          currentItemComments.list = response.data;
+        } catch (error) {
+          console.error(`Error fetching comments for ${itemId}:`, error);
+          currentItemComments.error =
+            error.response?.data?.msg || "Neizdevās ielādēt komentārus.";
+        } finally {
+          currentItemComments.isLoading = false;
+          this.setCommentingBusy(itemId, false);
         }
+      }
     },
     async addComment(itemId) {
-        const text = this.newCommentText[itemId]?.trim();
-        if (!text) return;
+      const text = this.newCommentText[itemId]?.trim();
+      if (!text) return;
 
-        const currentItemComments = this.itemComments[itemId];
-        this.setCommentingBusy(itemId, true);
-        currentItemComments.error = null; 
-        try {
-            const response = await axios.post(`/api/comments/${itemId}`, { text });
-            currentItemComments.list.push(response.data.comment);
-            this.newCommentText[itemId] = ""; 
-        } catch (error) {
-            console.error(`Error adding comment for ${itemId}:`, error);
-            currentItemComments.error = error.response?.data?.msg || "Neizdevās pievienot komentāru.";
-        } finally {
-            this.setCommentingBusy(itemId, false);
-        }
+      const currentItemComments = this.itemComments[itemId];
+      this.setCommentingBusy(itemId, true);
+      currentItemComments.error = null;
+      try {
+        const response = await axios.post(`/api/comments/${itemId}`, { text });
+        currentItemComments.list.push(response.data.comment);
+        this.newCommentText[itemId] = "";
+      } catch (error) {
+        console.error(`Error adding comment for ${itemId}:`, error);
+        currentItemComments.error =
+          error.response?.data?.msg || "Neizdevās pievienot komentāru.";
+      } finally {
+        this.setCommentingBusy(itemId, false);
+      }
     },
     async deleteComment(itemId, commentId) {
-        if (!confirm("Vai tiešām vēlaties dzēst šo komentāru?")) return;
+      if (!confirm("Vai tiešām vēlaties dzēst šo komentāru?")) return;
 
-        const currentItemComments = this.itemComments[itemId];
-        this.setCommentingBusy(itemId, true);
-        currentItemComments.error = null;
-        try {
-            await axios.delete(`/api/comments/${commentId}`);
-            currentItemComments.list = currentItemComments.list.filter(c => c._id !== commentId);
-        } catch (error) {
-            console.error(`Error deleting comment ${commentId}:`, error);
-            currentItemComments.error = error.response?.data?.msg || "Neizdevās dzēst komentāru.";
-        } finally {
-            this.setCommentingBusy(itemId, false);
-        }
-    }
+      const currentItemComments = this.itemComments[itemId];
+      this.setCommentingBusy(itemId, true);
+      currentItemComments.error = null;
+      try {
+        await axios.delete(`/api/comments/${commentId}`);
+        currentItemComments.list = currentItemComments.list.filter(
+          (c) => c._id !== commentId
+        );
+      } catch (error) {
+        console.error(`Error deleting comment ${commentId}:`, error);
+        currentItemComments.error =
+          error.response?.data?.msg || "Neizdevās dzēst komentāru.";
+      } finally {
+        this.setCommentingBusy(itemId, false);
+      }
+    },
   },
 };
 </script>
@@ -463,29 +755,33 @@ export default {
 .list-item {
   margin-bottom: 1.5rem;
   transition: box-shadow 0.2s ease;
-  overflow: hidden;
+  overflow: hidden; /* Important for collapsible content */
 }
 .list-item:hover {
   box-shadow: var(--shadow-md);
 }
 
 .item-main-info {
-    display: flex;
-    align-items: flex-start; 
-    gap: 1rem;
-    padding-bottom: 0.75rem;
-    border-bottom: 1px dashed var(--border-color);
-    margin-bottom: 0.75rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px dashed var(--border-color);
+  margin-bottom: 0.75rem;
 }
 .item-type-icon {
-    font-size: 1.8rem;
-    padding-top: 0.2rem; 
+  font-size: 1.8rem;
+  padding-top: 0.2rem;
 }
-.item-type-icon.homework { color: var(--primary-color); }
-.item-type-icon.test { color: var(--warning-color); }
+.item-type-icon.homework {
+  color: var(--primary-color);
+}
+.item-type-icon.test {
+  color: var(--warning-color);
+}
 
 .item-details {
-    flex-grow: 1;
+  flex-grow: 1;
 }
 .item-subject {
   margin: 0 0 0.25rem 0;
@@ -504,10 +800,16 @@ export default {
   display: inline-block;
   margin-bottom: 0.5rem;
 }
-.list-item.homework .item-type-badge { background-color: var(--primary-color); }
-.list-item.test .item-type-badge { background-color: var(--warning-color); color: var(--text-color); }
+.list-item.homework .item-type-badge {
+  background-color: var(--primary-color);
+}
+.list-item.test .item-type-badge {
+  background-color: var(--warning-color);
+  color: var(--text-color);
+}
 
-.item-date, .item-group-display {
+.item-date,
+.item-group-display {
   font-size: 0.9rem;
   color: #555;
   margin: 0.25rem 0;
@@ -515,33 +817,45 @@ export default {
   align-items: center;
   gap: 0.4rem;
 }
-.item-date .fas, .item-group-display .fas { color: var(--secondary-color); }
+.item-date .fas,
+.item-group-display .fas {
+  color: var(--secondary-color);
+}
 
 .collapsible-content {
   max-height: 0;
   overflow: hidden;
-  transition: max-height 0.4s ease-out, opacity 0.3s ease-out, padding-top 0.4s ease-out, padding-bottom 0.4s ease-out;
+  transition: max-height 0.4s ease-out, opacity 0.3s ease-out,
+    padding-top 0.4s ease-out, padding-bottom 0.4s ease-out;
   opacity: 0;
   padding-top: 0;
   padding-bottom: 0;
 }
 .collapsible-content.expanded {
-  max-height: 1000px; 
+  max-height: 1000px; /* Adjust if content can be very long */
   opacity: 1;
   padding-top: 0.75rem;
   padding-bottom: 0.75rem;
 }
 
-.item-description, .item-additional-info {
+.item-description,
+.item-additional-info {
   font-size: 0.95rem;
   line-height: 1.6;
   color: #495057;
   margin-bottom: 0.5rem;
 }
-.item-description strong, .item-additional-info strong { color: var(--text-color); }
+.item-description strong,
+.item-additional-info strong {
+  color: var(--text-color);
+}
 
-.item-links, .item-files { margin-top: 0.75rem; }
-.item-links strong, .item-files strong {
+.item-links,
+.item-files {
+  margin-top: 0.75rem;
+}
+.item-links strong,
+.item-files strong {
   display: flex;
   align-items: center;
   gap: 0.4rem;
@@ -549,12 +863,14 @@ export default {
   color: var(--text-color);
   margin-bottom: 0.3rem;
 }
-.item-links ul, .item-files ul {
+.item-links ul,
+.item-files ul {
   list-style-type: none;
-  padding-left: 1.5rem; 
+  padding-left: 1.5rem; /* Indent for visual hierarchy */
   margin: 0;
 }
-.item-links li, .item-files li.file-entry {
+.item-links li,
+.item-files li.file-entry {
   font-size: 0.9em;
   margin-bottom: 0.25rem;
   word-break: break-all;
@@ -562,10 +878,21 @@ export default {
   align-items: center;
   gap: 0.3rem;
 }
-.item-links a { color: var(--link-color); text-decoration: none; }
-.item-links a:hover { text-decoration: underline; }
-.file-entry .fas { color: var(--secondary-color); }
-.file-size { font-size: 0.9em; color: #6c757d; margin-left: 0.5rem; }
+.item-links a {
+  color: var(--link-color);
+  text-decoration: none;
+}
+.item-links a:hover {
+  text-decoration: underline;
+}
+.file-entry .fas {
+  color: var(--secondary-color);
+}
+.file-size {
+  font-size: 0.9em;
+  color: #6c757d;
+  margin-left: 0.5rem;
+}
 
 .item-meta {
   margin-top: 1rem;
@@ -574,16 +901,30 @@ export default {
   font-size: 0.8rem;
   color: #7f8c8d;
 }
-.item-meta p { margin: 0.25rem 0; display: flex; align-items: center; gap: 0.4rem; }
-.item-meta .fas { font-size: 0.9em; }
+.item-meta p {
+  margin: 0.25rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.item-meta .fas {
+  font-size: 0.9em;
+}
 
 .list-item.item-done {
-  background-color: #e9f5e9; 
+  background-color: #e9f5e9; /* Light green background for done items */
   border-left-color: var(--success-color);
 }
-.list-item.item-done .item-main-info .item-type-icon.homework { color: var(--success-color); }
-.list-item.item-done .item-main-info .item-type-icon.test { color: var(--success-color); }
-.list-item.item-done .item-subject { text-decoration: line-through; color: #5a6268; }
+.list-item.item-done .item-main-info .item-type-icon.homework {
+  color: var(--success-color);
+}
+.list-item.item-done .item-main-info .item-type-icon.test {
+  color: var(--success-color);
+}
+.list-item.item-done .item-subject {
+  text-decoration: line-through;
+  color: #5a6268;
+}
 
 .item-actions-footer {
   margin-top: 1rem;
@@ -595,8 +936,16 @@ export default {
   flex-wrap: wrap;
   gap: 0.75rem;
 }
-.main-actions { display: flex; align-items: center; gap: 0.75rem; }
-.contextual-actions { display: flex; align-items: center; gap: 0.5rem; }
+.main-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.contextual-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
 
 .progress-checkbox-label {
   display: flex;
@@ -608,34 +957,60 @@ export default {
   border-radius: var(--border-radius);
   transition: background-color 0.2s;
 }
-.progress-checkbox-label:hover { background-color: #e9ecef; }
-.progress-checkbox-label input[type="checkbox"] { display: none; }
-.progress-checkbox-label .fas, .progress-checkbox-label .far {
+.progress-checkbox-label:hover {
+  background-color: #e9ecef;
+}
+.progress-checkbox-label input[type="checkbox"] {
+  display: none;
+} /* Hide actual checkbox */
+.progress-checkbox-label .fas,
+.progress-checkbox-label .far {
   margin-right: 0.5rem;
-  font-size: 1.2em; 
+  font-size: 1.2em; /* Make icon a bit larger */
   color: var(--primary-color);
 }
-.list-item.item-done .progress-checkbox-label .fas, 
+.list-item.item-done .progress-checkbox-label .fas,
 .list-item.item-done .progress-checkbox-label .far {
   color: var(--success-color);
 }
 
 .action-button-small {
+  /* Using global .action-button styles with smaller padding/font */
   padding: 0.4rem 0.8rem;
   font-size: 0.85em;
 }
-.action-button-small i { margin-right: 0.3rem; }
-.expand-toggle { background-color: var(--secondary-color); }
-.comments-toggle { background-color: var(--info-color); }
-.comment-count { font-size: 0.85em; margin-left: 0.25rem; }
-.owner-admin-actions { display: flex; gap: 0.5rem; }
-.edit-btn { background-color: var(--warning-color); color: var(--text-color); }
-.delete-btn { background-color: var(--danger-color); }
+.action-button-small i {
+  margin-right: 0.3rem;
+}
+.expand-toggle {
+  background-color: var(--secondary-color);
+}
+.comments-toggle {
+  background-color: var(--info-color);
+}
+.comment-count {
+  font-size: 0.85em;
+  margin-left: 0.25rem;
+}
+.owner-admin-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+.edit-btn {
+  background-color: var(--warning-color);
+  color: var(--text-color);
+}
+.delete-btn {
+  background-color: var(--danger-color);
+}
 
-.comments-area-wrapper { margin-top: 1rem; }
+.comments-area-wrapper {
+  margin-top: 1rem;
+} /* Add some space before comments area */
 .comments-area {
+  /* Uses .card-style-inner for nested card appearance */
   padding: 1rem;
-  margin-top: 0.5rem; 
+  margin-top: 0.5rem; /* Space from the actions footer */
 }
 .comments-area h4 {
   font-size: 1.1rem;
@@ -652,22 +1027,31 @@ export default {
   text-align: center;
   padding: 1rem 0;
   display: flex;
-  flex-direction: column;
+  flex-direction: column; /* Stack icon and text */
   align-items: center;
   gap: 0.5rem;
 }
-.no-comments .fas { font-size: 1.5rem; opacity: 0.6; }
+.no-comments .fas {
+  font-size: 1.5rem;
+  opacity: 0.6;
+}
 
-.comments-list { list-style-type: none; padding: 0; margin:0 0 1rem 0; }
+.comments-list {
+  list-style-type: none;
+  padding: 0;
+  margin: 0 0 1rem 0;
+}
 .comment-item {
   border-bottom: 1px dotted #e0e0e0;
   padding: 0.75rem 0;
 }
-.comment-item:last-child { border-bottom: none; }
+.comment-item:last-child {
+  border-bottom: none;
+}
 .comment-text {
   margin: 0 0 0.5rem 0;
-  white-space: pre-wrap;
-  word-wrap: break-word;
+  white-space: pre-wrap; /* Preserve whitespace and newlines */
+  word-wrap: break-word; /* Break long words */
   font-size: 0.95rem;
   color: var(--text-color);
 }
@@ -675,23 +1059,31 @@ export default {
   font-size: 0.8rem;
   color: #6c757d;
   display: flex;
-  justify-content: space-between;
+  justify-content: space-between; /* Pushes delete button to the right if it's part of this flex */
   align-items: center;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: 0.5rem; /* Space between name, date, and delete button */
 }
-.comment-meta span { display: flex; align-items: center; gap: 0.3rem; }
+.comment-meta span {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
 .delete-comment-btn {
   background: none;
   border: none;
   color: var(--danger-color);
-  font-size: 1em; 
+  font-size: 1em; /* Relative to parent (.comment-meta) */
   cursor: pointer;
   padding: 0.25rem;
-  line-height: 1;
+  line-height: 1; /* Important for icon-only buttons */
 }
-.delete-comment-btn:hover { color: #c82333; }
-.delete-comment-btn .fas { font-size: 1.1em; } 
+.delete-comment-btn:hover {
+  color: #c82333; /* Darker red */
+}
+.delete-comment-btn .fas {
+  font-size: 1.1em;
+} /* Control icon size */
 
 .add-comment-form {
   margin-top: 1rem;
@@ -700,29 +1092,38 @@ export default {
   gap: 0.5rem;
 }
 .add-comment-form textarea {
-  min-height: 70px; 
+  min-height: 70px; /* Decent starting height */
   font-size: 0.95em;
+  /* Inherits global styles for textarea */
 }
-.add-comment-form .action-button { 
-  align-self: flex-end;
-  padding: 0.5rem 1rem; 
+.add-comment-form .action-button {
+  /* For the "Pievienot Komentāru" button */
+  align-self: flex-end; /* Button to the right */
+  padding: 0.5rem 1rem; /* Adjust padding as needed */
 }
 
-.loading-indicator.small { font-size: 0.95em; padding: 0.5rem; }
-.error-message.small { font-size: 0.9em; padding: 0.5rem; margin-bottom: 0.5rem; }
+.loading-indicator.small {
+  font-size: 0.95em;
+  padding: 0.5rem;
+}
+.error-message.small {
+  font-size: 0.9em;
+  padding: 0.5rem;
+  margin-bottom: 0.5rem;
+}
 
 @media (max-width: 768px) {
-    .filters-grid {
-        grid-template-columns: 1fr; 
-    }
-    .item-actions-footer {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-    .contextual-actions {
-        margin-top: 0.5rem;
-        width: 100%;
-        justify-content: space-between; 
-    }
+  .filters-grid {
+    grid-template-columns: 1fr; /* Stack filters on smaller screens */
+  }
+  .item-actions-footer {
+    flex-direction: column;
+    align-items: flex-start; /* Align all action groups to the start */
+  }
+  .contextual-actions {
+    margin-top: 0.5rem;
+    width: 100%;
+    justify-content: space-between; /* Spread out comments and edit/delete */
+  }
 }
 </style>
