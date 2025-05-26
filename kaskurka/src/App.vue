@@ -301,8 +301,7 @@
 
     <footer class="app-footer">
       <p>
-        © {{ new Date().getFullYear() }} KasKurKa. Izstrādāja Sidnijs Jurčiks.
-        Visas tiesības aizsargātas.
+        © {{ new Date().getFullYear() }} KasKurKa. Izstrādāja Sidnijs Jurciks.
       </p>
     </footer>
   </div>
